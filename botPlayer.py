@@ -89,7 +89,7 @@ def play(model_path: str):
                 print(output)
 
                 keys_output, mousex_output, mousey_output = dataEncoder.output_to_mappings(output)
-                keys = [1 if x > random.uniform(0, 0.8) else 0 for x in keys_output]
+                keys = [1 if x > dataEncoder.KEY_THRESHOLD else 0 for x in keys_output]
 
                 mousex_ind = np.argmax(mousex_output)
                 mousey_ind = np.argmax(mousey_output)

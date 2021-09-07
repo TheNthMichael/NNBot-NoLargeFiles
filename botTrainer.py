@@ -144,7 +144,7 @@ def train(path, chunk_size:int=None, model_save_name:str=None):
     #opt = keras.optimizers.Adam(lr=1e-4, decay=1e-5)
     model.compile(optimizer=opt, loss="binary_crossentropy", metrics=[f1])
     model.fit([x2_train, x3_train], y_train,\
-            epochs=10, batch_size=10,\
+            epochs=100, batch_size=20,\
             callbacks=[tensorBoard, earlystopper])
 
     val_loss, val_acc = model.evaluate([x2_test, x3_test], y_test)
