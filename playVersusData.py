@@ -7,6 +7,7 @@ import time
 import keras
 import keras.backend as K
 import random
+import tensorflow as tf
 
 def my_loss(targets, logits):
     weights = np.array([0.9 for _ in range(len(dataEncoder.BLANK_CLASS_OUTPUT))])
@@ -30,9 +31,9 @@ def f1(y_true, y_pred):
     return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
 
 
-the_file = open("TestData/dataset_drift_snow.pickle", "rb")
+the_file = open("TestData/dataset_aottg_forest.pickle", "rb")
 
-the_model = "Models/kmodel_drift_general_bce.model"
+the_model = "Models/km_aottg_forest.model"
 
 model = keras.models.load_model(the_model, custom_objects={"f1": f1, "my_loss": my_loss})
 
@@ -83,7 +84,7 @@ for i in range(len(training_inputs_frames)):
 
     output = model.predict([X2, X3])[0]
 
-    print(output)
+    #print(output)
 
     keys_output, mousex_output, mousey_output = dataEncoder.output_to_mappings(output)
     #keys_bot = [1 if x >= dataEncoder.KEY_THRESHOLD else 0 for x in keys_output]
@@ -106,7 +107,7 @@ for i in range(len(training_inputs_frames)):
     mousey = dataEncoder.MOUSE_CLASSES[mousey_ind]
 
 
-    printmouse = f"Mouse: ({int(mousex)}, {int(mousey)})"
+    #printmouse = f"Mouse: ({int(mousex)}, {int(mousey)})"
     # End Bot
 
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
@@ -120,7 +121,7 @@ for i in range(len(training_inputs_frames)):
     j += 1
     for input in range(len(inputshistory)):
         keys, mousex, mousey = dataEncoder.output_to_mappings(inputshistory[input])
-        cv2.putText(frame, f"history[t-{dataEncoder.HISTORY_LENGTH - input}]: {keys}, {mousex}, {mousey}", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.putText(frame, f"history[t-{dataEncoder.HISTORY_LENGTH - input}]: {keys}, {mousex}, {mousey} | Mouse: ({dataEncoder.MOUSE_CLASSES[np.argmax(mousex)]}, {dataEncoder.MOUSE_CLASSES[np.argmax(mousey)]})", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
         j += 1
 
     j += 1
@@ -130,7 +131,7 @@ for i in range(len(training_inputs_frames)):
     j += 1
     for input in range(len(input_history_bot)):
         keys, mousex, mousey = dataEncoder.output_to_mappings(input_history_bot[input])
-        cv2.putText(frame, f"history[t-{dataEncoder.HISTORY_LENGTH - input}]: {keys}, {mousex}, {mousey}", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.putText(frame, f"history[t-{dataEncoder.HISTORY_LENGTH - input}]: {keys}, {mousex}, {mousey} | Mouse: ({dataEncoder.MOUSE_CLASSES[np.argmax(mousex)]}, {dataEncoder.MOUSE_CLASSES[np.argmax(mousey)]})", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
         j += 1
     
     for input in range(len(input_history_bot)):
@@ -138,9 +139,9 @@ for i in range(len(training_inputs_frames)):
         keys_b, mousex_b, mousey_b = dataEncoder.output_to_mappings(input_history_bot[input])
         human = inputshistory[input]
         bot = input_history_bot[input]
-        for i in range(len(keys)):
-            if keys[i] == 1:
-                if keys_b[i] == keys[i]:
+        for i in range(len(human)):
+            if human[i] == 1:
+                if bot[i] == human[i]:
                     num_correct += 1
                 num_total += 1
     cv2.putText(frame, f"Accuracy: {num_correct} / {num_total} ({int(num_correct * 100 / num_total)} %)", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)

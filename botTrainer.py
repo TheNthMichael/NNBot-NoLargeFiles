@@ -89,9 +89,9 @@ def train(path, chunk_size:int=None, model_save_name:str=None):
     conv2Layer = 3
     denseLayer = 2
     dropout = 0.3
-
-    #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.50)
-    #sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
     patience = 6
     timenow = str(datetime.datetime.now()).replace(":","_")
     earlystopper = EarlyStopping(monitor="f1", patience=patience, verbose=1, mode="max", restore_best_weights=True)
@@ -145,10 +145,9 @@ def train(path, chunk_size:int=None, model_save_name:str=None):
     model.compile(optimizer=opt, loss="binary_crossentropy", metrics=[f1])
     model.fit([x2_train, x3_train], y_train,\
             epochs=100, batch_size=20,\
-            callbacks=[tensorBoard, earlystopper])
-
-    val_loss, val_acc = model.evaluate([x2_test, x3_test], y_test)
-    print(f"Validation_loss: {val_loss}, Validation accuracy: {val_acc}")
+            callbacks=[tensorBoard])
+    #val_loss, val_acc = model.evaluate([x2_test, x3_test], y_test)
+    #print(f"Validation_loss: {val_loss}, Validation accuracy: {val_acc}")
 
     print(f"Saving Model at path {NAME}.model...")
     model.save(f"{NAME}.model")

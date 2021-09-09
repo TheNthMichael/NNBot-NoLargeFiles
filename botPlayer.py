@@ -12,6 +12,7 @@ from pynput.mouse import Listener as MouseListener
 import stateManager
 import keras.backend as K
 import random
+import tensorflow as tf
 
 def on_press_handler(key):
     stateManager.try_add_key_pressed(key)
@@ -54,6 +55,9 @@ def f1(y_true, y_pred):
     return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
 
 def play(model_path: str):
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
     model = keras.models.load_model(model_path, custom_objects={"f1": f1, "my_loss": my_loss})
     keyboard = KeyController()
     sct = mss()
