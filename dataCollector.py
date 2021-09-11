@@ -8,7 +8,7 @@ import pickle
 import stateManager
 from datetime import datetime
 from mss import mss
-from PIL import Image
+from pil import Image
 import pynput
 from pynput.keyboard import Key, Listener as KeyListener
 from pynput.mouse import Listener as MouseListener

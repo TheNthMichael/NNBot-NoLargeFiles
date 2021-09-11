@@ -1,4 +1,3 @@
-from PIL.Image import new
 import dataEncoder
 
 """Some things need to be stored globally

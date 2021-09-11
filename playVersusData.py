@@ -82,7 +82,7 @@ for i in range(len(training_inputs_frames)):
     X3 = [input_history_bot for i in range(1)]
     X3 = np.asarray(X3)
 
-    output = model.predict([X2, X3])[0]
+    output = model([X2, X3])[0]
 
     #print(output)
 

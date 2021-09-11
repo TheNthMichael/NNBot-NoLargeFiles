@@ -4,3 +4,5 @@ data/
 __pycache__/
 Models/
 .vscode/
+Resources/
+d3dshot/

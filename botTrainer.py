@@ -4,7 +4,6 @@
 
 from dataEncoder import BLANK_CLASS_OUTPUT
 import tensorflow as tf
-import matplotlib.pyplot as plt
 import numpy as np
 import keras
 import datetime
