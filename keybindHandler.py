@@ -74,6 +74,9 @@ buttons_pressed_by_code = [0 for _ in ONEHOTINDEX_TO_BUTTON]
 # Handle Recording
 buttons_pressed_by_human = [0 for _ in ONEHOTINDEX_TO_BUTTON]
 
+"""A higher order function that returns a function which will map one-hot encoded
+actions from configuration file a to a one-hot encoded set of actions from
+configuration file b."""
 def control_scheme_transform(config_path_a, config_path_b):
     act_2_btn_a = create_action_to_button(config_path_a)
     btn_2_act_a = {v: k for k, v in act_2_btn_a.items()}
@@ -94,6 +97,10 @@ def control_scheme_transform(config_path_a, config_path_b):
 
         b_btn = [act_2_btn_b[x] for x in a_act]
         b_oh = [btn_2_oh_b[x] for x in b_btn]"""
+        """This works by mapping the index of each element in actions to the btn name for config a,
+        which is then fed into the action map for config a which is then fed into the btn map for
+        config b which is then fed into the one-hot index mapping for config b which is then used
+        to generate the one-hot encoded array for the control scheme. This phyiscally hurt to write."""
         actions_b = [x for x in actions]
         for i in range(len(actions)):
             actions_b[btn_2_oh_b[act_2_btn_b[btn_2_act_a[oh_2_btn_a[i]]]]] = actions[i]
