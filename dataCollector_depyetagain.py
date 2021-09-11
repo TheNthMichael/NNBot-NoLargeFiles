@@ -1,3 +1,4 @@
+from genericpath import samefile
 import numpy as np
 import dataEncoder
 import cv2
@@ -6,10 +7,11 @@ import os
 import pickle
 import stateManager
 from datetime import datetime
+from mss import mss
 from pil import Image
+import pynput
 from pynput.keyboard import Key, Listener as KeyListener
 from pynput.mouse import Listener as MouseListener
-from frameHandler import *
 
 def on_press_handler(key):
     stateManager.try_add_key_pressed(key)
@@ -58,7 +60,7 @@ class DataCollector:
             self.dataset_path = os.path.join(testdir, \
                 f"dataset{datetime.now().strftime('%Y%m%d%H%M%S')}.pickle")
         self.dataset_file = open(self.dataset_path, "wb")
-        self.frameHandler = FrameHandler(stateManager.monitor_region, stateManager.FPS)
+        self.sct = mss()
     
     def write_state_to_output(self, training_sample):
         pickle.dump(training_sample, self.dataset_file)

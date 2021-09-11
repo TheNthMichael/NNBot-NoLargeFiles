@@ -57,6 +57,11 @@ SPECIAL_KEYS_RECORDING = {
     str(Key.enter).lower(): 'enter',
 }
 
+MOUSE_BUTTONS_RECORDING = {
+    str(Button.left): "lmouse",
+    str(Button.right): "rmouse"
+}
+
 # Create an array of all zeros for every possible button action
 EMPTY_BUTTONS_ONEHOT = [0 for _ in range(len(ACTION_TO_BUTTON))]
 
@@ -73,6 +78,26 @@ buttons_pressed_by_code = [0 for _ in ONEHOTINDEX_TO_BUTTON]
 
 # Handle Recording
 buttons_pressed_by_human = [0 for _ in ONEHOTINDEX_TO_BUTTON]
+
+
+"""Record the given input"""
+def record_input(input, pressed: bool):
+    pynput_format = str(input).lower()
+    if pynput_format in SPECIAL_KEYS_RECORDING:
+        index = BUTTON_TO_ONEHOTINDEX[SPECIAL_KEYS_RECORDING[pynput_format]]
+        buttons_pressed_by_human[index] = int(pressed)
+    elif pynput_format in MOUSE_BUTTONS_RECORDING:
+        index = BUTTON_TO_ONEHOTINDEX[MOUSE_BUTTONS_RECORDING[pynput_format]]
+        buttons_pressed_by_human[index] = int(pressed)
+    else:
+        try:
+            pynput_format = str(input).lower().replace("'", "")
+            index = BUTTON_TO_ONEHOTINDEX[pynput_format]
+            buttons_pressed_by_human[index] = int(pressed)
+        except:
+            pass
+
+
 
 """A higher order function that returns a function which will map one-hot encoded
 actions from configuration file a to a one-hot encoded set of actions from
