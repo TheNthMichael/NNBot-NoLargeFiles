@@ -12,14 +12,15 @@ from pynput.keyboard import Key, Listener as KeyListener
 from pynput.mouse import Listener as MouseListener
 from frameHandler import *
 
+"""Handler for key presses.
+
+Records the pressed keys through the KeybindHandler."""
 def on_press_handler(key):
     keybindHandler.record_input(key, pressed=True)
-    try:
-        print('alphanumeric key {0} pressed'.format(key.char))
-          
-    except AttributeError:
-        print('special key {0} pressed'.format(key))
 
+"""Records the release of pressed keys through the KeybindHandler.
+
+Listens for commands that signal to start recording or to exit the program."""
 def on_release_handler(key):
     if key == Key.f3:
         stateManager.is_recording = not stateManager.is_recording
@@ -28,15 +29,15 @@ def on_release_handler(key):
         stateManager.is_not_exiting = not stateManager.is_not_exiting
         return stateManager.is_not_exiting 
     keybindHandler.record_input(key, pressed=False)
-    print('{0} released'.format(key))
     return stateManager.is_not_exiting
 
+"""Records the movement of the mouse in pixels through the KeybindHandler. (Frame independent)"""
 def on_move_handler(x, y):
     keybindHandler.last_mouse_moved_x = x
     keybindHandler.last_mouse_moved_y = y
-    #print('Pointer moved to {0}'.format((x, y)))
     return stateManager.is_not_exiting
 
+"""Records mouse button clicks through the KeybindHandler."""
 def on_click_handler(x, y, button, pressed):
     keybindHandler.record_input(button, pressed=pressed)
     print(f'{str(button)} is pressed {pressed} at {(x,y)}')
@@ -54,7 +55,11 @@ class TrainingSample:
         self.inputs = inputs
         self.raw_mouse = raw_mouse
 
+"""A class for handling the collection of frames matched with user inputs at the time of the frame
+or for a duration between frames."""
 class DataCollector:
+    """Creates the folder and opens the file for dumping objects into.
+    Creates an instance of a FrameHandler."""
     def __init__(self, dataset_path:str=None) -> None:
         self.dataset_path = dataset_path
         if self.dataset_path == None:
@@ -68,9 +73,13 @@ class DataCollector:
         self.dataset_file = open(self.dataset_path, "wb")
         self.frameHandler = FrameHandler(stateManager.monitor_region, stateManager.FPS)
     
+    """Dumps the TrainingSample object to the pickle file.
+    These objects are appended to the same file and can be read
+    sequentially through pickle.load(file)."""
     def write_state_to_output(self, training_sample):
         pickle.dump(training_sample, self.dataset_file)
 
+    """Runs the data collector."""
     def run(self):
         # used to record the time when we processed last frame
         prev_frame_time = 0
@@ -79,7 +88,6 @@ class DataCollector:
         sampleNum = 0
         prev_mousex = None
         prev_mousey = None
-        prev_time = 0
 
         cv2.namedWindow('collector')
         try:
@@ -91,7 +99,6 @@ class DataCollector:
                         img = self.frameHandler.get_current_frame()
                         img = cv2.resize(img, stateManager.screen_cap_sizes)
 
-                        cur_time = time.time()
                         cur_mousex = keybindHandler.last_mouse_moved_x
                         cur_mousey = keybindHandler.last_mouse_moved_y
 
@@ -101,12 +108,6 @@ class DataCollector:
 
                         mousedx = cur_mousex - prev_mousex
                         mousedy = cur_mousey - prev_mousey
-
-                        #mousedx *= 1 / (cur_time - prev_time)
-                        #mousedy *= 1 / (cur_time - prev_time)
-
-                        #mousedx = math.ceil(mousedx)
-                        #mousedy = math.ceil(mousedy)
 
                         prev_mousex = cur_mousex
                         prev_mousey = cur_mousey
