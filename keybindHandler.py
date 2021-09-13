@@ -1,10 +1,20 @@
 import json
+import sys
 import os
+import stateManager
 from pynput.keyboard import Key, Controller as KeyController, Controller as MouseController
 from pynput.mouse import Button, Controller as MouseController
 
 def create_action_to_button(config_path: str) -> dict:
     config = json.load(open(config_path))
+    # Check for duplicate binds.
+    list_config = [config[x] for x in config]
+    for x in config:
+        if list_config.count(config[x]) > 1:
+            print("Error: found a duplicate input being used in config.json.")
+            print(f"Please rebind {x} to a key other than {config[x]}")
+            stateManager.is_not_exiting = False
+            #sys.exit()
     # Verify that this is correct
     assert([type(x) is str and type(config[x]) is str for x in config])
     return config
@@ -51,15 +61,14 @@ SPECIAL_KEYS_RECORDING = {
     str(Key.shift).lower(): 'shift',
     str(Key.caps_lock).lower(): 'caps_lock',
     str(Key.ctrl).lower(): 'ctrl',
-    str(Key.esc).lower(): 'esc',
     str(Key.tab).lower(): 'tab',
     str(Key.media_volume_up).lower(): 'media_volume_up',
     str(Key.enter).lower(): 'enter',
 }
 
 MOUSE_BUTTONS_RECORDING = {
-    str(Button.left): "lmouse",
-    str(Button.right): "rmouse"
+    str(Button.left).lower(): "lmouse",
+    str(Button.right).lower(): "rmouse"
 }
 
 # Create an array of all zeros for every possible button action
@@ -78,17 +87,21 @@ buttons_pressed_by_code = [0 for _ in ONEHOTINDEX_TO_BUTTON]
 
 # Handle Recording
 buttons_pressed_by_human = [0 for _ in ONEHOTINDEX_TO_BUTTON]
+last_mouse_moved_x = 0
+last_mouse_moved_y = 0
 
 
 """Record the given input"""
 def record_input(input, pressed: bool):
     pynput_format = str(input).lower()
     if pynput_format in SPECIAL_KEYS_RECORDING:
-        index = BUTTON_TO_ONEHOTINDEX[SPECIAL_KEYS_RECORDING[pynput_format]]
-        buttons_pressed_by_human[index] = int(pressed)
+        if SPECIAL_KEYS_RECORDING[pynput_format] in BUTTON_TO_ACTION:
+            index = BUTTON_TO_ONEHOTINDEX[SPECIAL_KEYS_RECORDING[pynput_format]]
+            buttons_pressed_by_human[index] = int(pressed)
     elif pynput_format in MOUSE_BUTTONS_RECORDING:
-        index = BUTTON_TO_ONEHOTINDEX[MOUSE_BUTTONS_RECORDING[pynput_format]]
-        buttons_pressed_by_human[index] = int(pressed)
+        if MOUSE_BUTTONS_RECORDING[pynput_format] in BUTTON_TO_ACTION:
+            index = BUTTON_TO_ONEHOTINDEX[MOUSE_BUTTONS_RECORDING[pynput_format]]
+            buttons_pressed_by_human[index] = int(pressed)
     else:
         try:
             pynput_format = str(input).lower().replace("'", "")
@@ -96,8 +109,6 @@ def record_input(input, pressed: bool):
             buttons_pressed_by_human[index] = int(pressed)
         except:
             pass
-
-
 
 """A higher order function that returns a function which will map one-hot encoded
 actions from configuration file a to a one-hot encoded set of actions from
@@ -210,6 +221,27 @@ def release_pressed_buttons(keyboard, mouse):
                 mouse.release(MOUSE_BUTTONS[button])
             # Record button
             buttons_pressed_by_code[i] = 0
+
+
+"""This function is useful for printing the actual names
+of the keys pressed and also can be used for clearing all
+pressed keys."""
+def get_keys_pressed():
+    debug_keys_pressed = []
+    for i in range(len(buttons_pressed_by_human)):
+        if buttons_pressed_by_human[i] == 1:
+            debug_keys_pressed.append(ONEHOTINDEX_TO_BUTTON[i])
+    return debug_keys_pressed
+
+"""This function is useful for printing the actual names
+of the keys pressed and also can be used for clearing all
+pressed keys."""
+def get_your_keys_pressed(keys):
+    debug_keys_pressed = []
+    for i in range(len(keys)):
+        if keys[i] == 1:
+            debug_keys_pressed.append(ONEHOTINDEX_TO_BUTTON[i])
+    return debug_keys_pressed
 
 
 

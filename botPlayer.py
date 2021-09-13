@@ -5,45 +5,29 @@ import ctypes
 import time
 import numpy as np
 import dataEncoder
-from mss import mss
-from pil import Image
 from pynput.keyboard import Key, Controller as KeyController, Listener as KeyListener
 from pynput.mouse import Listener as MouseListener
 import stateManager
+from frameHandler import *
 import keras.backend as K
 import random
 import tensorflow as tf
-import d3dshot
 import subprocess
 
-def on_click(x, y, button, pressed):
-    print('{0} at {1}'.format(
-        'Pressed' if pressed else 'Released',
-        (x, y)))
-    if not pressed:
-        # Stop listener
-        return False
+def on_click_handler(x, y, button, pressed):
+    print(f'{str(button)} is pressed {pressed} at {(x,y)}')
+    return stateManager.is_not_exiting
 
 def on_press_handler(key):
-    stateManager.try_add_key_pressed(key)
-    try:
-        pass
-        #print('alphanumeric key {0} pressed'.format(key.char))
-          
-    except AttributeError:
-        pass
-        #print('special key {0} pressed'.format(key))
     return stateManager.is_not_exiting
 
 def on_release_handler(key):
     if key == Key.f3:
         stateManager.is_recording = not stateManager.is_recording
         return stateManager.is_not_exiting
-    if key == Key.f6:
+    if key == Key.esc:
         stateManager.is_not_exiting = not stateManager.is_not_exiting
         return stateManager.is_not_exiting 
-    stateManager.try_remove_key_pressed(key)
-    #print('{0} released'.format(key))
     return stateManager.is_not_exiting
 
 def my_loss(targets, logits):
@@ -67,22 +51,6 @@ def f1(y_true, y_pred):
     recall = recall(y_true, y_pred)
     return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
 
-def ffmpegGrab():
-    """Generator to read frames from ffmpeg subprocess"""
-    # Use "-f rawvideo" instead of "-f image2pipe" (command is working with image2pipe, but rawvideo is the correct format).
-    cmd = f'.\\Resources\\ffmpeg.exe -f gdigrab -framerate {60} -offset_x 0 -offset_y 0 -video_size {1920}x{1080} -i desktop -pix_fmt bgr24 -vcodec rawvideo -an -sn -f rawvideo -'
-
-    #proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-
-    # Don't use stderr=subprocess.STDOUT, and don't use shell=True
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-
-    while True:
-        raw_frame = proc.stdout.read(1920*1080*3)
-        frame = np.frombuffer(raw_frame, np.uint8)  # Use frombuffer instead of fromarray
-        frame = frame.reshape((1080, 1920, 3))
-        yield frame
-
 def play(model_path: str):
     
     gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -90,11 +58,8 @@ def play(model_path: str):
         tf.config.experimental.set_memory_growth(gpu, True)
     model = keras.models.load_model(model_path, custom_objects={"f1": f1, "my_loss": my_loss})
     keyboard = KeyController()
-    #d = d3dshot.create(capture_output="numpy", frame_buffer_size=stateManager.screen_cap_resolution * 3)
+    frameHandler = FrameHandler(stateManager.monitor_region, stateManager.FPS)
     try:
-        #d.capture()
-        gen = ffmpegGrab()
-        #sct = mss()
         # used to record the time when we processed last frame
         prev_frame_time = 0
 
@@ -110,13 +75,8 @@ def play(model_path: str):
         with KeyListener(on_press = on_press_handler,
                 on_release = on_release_handler) as key_listener:
             while stateManager.is_not_exiting:
-                #sct.get_pixels(stateManager.monitor_region)
-                #img = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
-                #img = np.array(img)
-                img = next(gen)
-                #img = d.get_latest_frame()
-                #if img is None:
-                    #continue
+                frameHandler.update()
+                img = frameHandler.get_current_frame()
                 img = cv2.resize(img, stateManager.screen_cap_sizes)
                 
                 if stateManager.is_recording:

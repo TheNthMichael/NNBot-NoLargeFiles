@@ -1,5 +1,4 @@
 import subprocess
-from typing_extensions import TypeVarTuple
 import numpy as np
 from threading import Event, Lock
 
