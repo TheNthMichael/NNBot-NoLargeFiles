@@ -25,3 +25,5 @@ Add PlayVersusData.py to the cli args.
 Add test suite for functions that we are uncertain of their in/outputs
 
 Add easy to use gui or interface for distribution of just the data collector.
+
+Move exit conditions to stateManager and have it be an event so that it can be used in threads.
