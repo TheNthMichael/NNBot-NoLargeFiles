@@ -1,4 +1,4 @@
-
+import threading
 import keras
 import cv2
 import ctypes
@@ -8,6 +8,7 @@ import dataEncoder
 from pynput.keyboard import Key, Controller as KeyController, Listener as KeyListener
 from pynput.mouse import Listener as MouseListener, Controller as MouseController
 import stateManager
+import actionHandler
 import keybindHandler
 from frameHandler import *
 import keras.backend as K
@@ -59,7 +60,11 @@ def play(model_path: str):
     model = keras.models.load_model(model_path, custom_objects={"f1": f1, "my_loss": my_loss})
     keyboard = KeyController()
     mouse = MouseController()
-    frameHandler = FrameHandler(stateManager.monitor_region, stateManager.FPS)
+    frame_handler = FrameHandler(stateManager.monitor_region, stateManager.FPS)
+    action_handler = actionHandler.ActionHandler(stateManager.FPS)
+    exit_event = threading.Event()
+    data_lock = threading.Lock()
+    action_thread = threading.Thread(target=actionHandler.action_handler_thread, args=(action_handler, exit_event, data_lock))
     try:
         # used to record the time when we processed last frame
         prev_frame_time = 0
@@ -73,11 +78,12 @@ def play(model_path: str):
 
         # used to record the time at which we processed current frame
         new_frame_time = 0
+        action_thread.start()
         with KeyListener(on_press = on_press_handler,
                 on_release = on_release_handler) as key_listener:
             while stateManager.is_not_exiting:
-                frameHandler.update()
-                img = frameHandler.get_current_frame()
+                frame_handler.update()
+                img = frame_handler.get_current_frame()
                 img = cv2.resize(img, stateManager.screen_cap_sizes)
                 
                 if stateManager.is_recording:
@@ -108,22 +114,17 @@ def play(model_path: str):
                     keys_h.extend(mousey_h)
                     input_history.append(keys_h)
 
-                    mousex = dataEncoder.MOUSE_CLASSES[mousex_ind]
-                    mousey = dataEncoder.MOUSE_CLASSES[mousey_ind]
+                    mousex = keybindHandler.MOUSE_CLASSES[mousex_ind]
+                    mousey = keybindHandler.MOUSE_CLASSES[mousey_ind]
+
+                    # Update the keys and mouse inputs - May need a data lock here to avoid issues with concurrency.
+                    action_handler.set_controller_action(keys, mousex, mousey)
 
 
                     printmouse = f"Mouse: ({int(mousex)}, {int(mousey)})"
                     
 
                     printkey = f"Keys: {str(keybindHandler.get_your_keys_pressed(keys))}"
-
-                    # Record keys pressed
-                    keybindHandler.update_pressed_keys(keys)
-
-                    #print(f"Moving Mouse: ({int(mousex)}, {int(mousey)})")
-                    x = int(mousex)
-                    y = int(mousey)
-                    ctypes.windll.user32.mouse_event(0x01, x, y, 0, 0)
 
                     # converting the fps to string so that we can display it on frame
                     # by using putText function

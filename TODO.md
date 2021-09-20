@@ -24,5 +24,4 @@ Add PlayVersusData.py to the cli args.
 
 Add test suite for functions that we are uncertain of their in/outputs
 
-Add formal interface for data collector for easy use during distribution.
-->
+Add easy to use gui or interface for distribution of just the data collector.
