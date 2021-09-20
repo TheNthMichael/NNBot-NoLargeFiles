@@ -15,8 +15,6 @@ KEY_TO_CODE_MAP = {
     "key.space": 7
 }
 
-KEY_THRESHOLD = 0.5
-
 HISTORY_LENGTH = 10
 
 # Define the mouse classes

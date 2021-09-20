@@ -6,13 +6,13 @@ import time
 import numpy as np
 import dataEncoder
 from pynput.keyboard import Key, Controller as KeyController, Listener as KeyListener
-from pynput.mouse import Listener as MouseListener
+from pynput.mouse import Listener as MouseListener, Controller as MouseController
 import stateManager
+import keybindHandler
 from frameHandler import *
 import keras.backend as K
 import random
 import tensorflow as tf
-import subprocess
 
 def on_click_handler(x, y, button, pressed):
     print(f'{str(button)} is pressed {pressed} at {(x,y)}')
@@ -58,6 +58,7 @@ def play(model_path: str):
         tf.config.experimental.set_memory_growth(gpu, True)
     model = keras.models.load_model(model_path, custom_objects={"f1": f1, "my_loss": my_loss})
     keyboard = KeyController()
+    mouse = MouseController()
     frameHandler = FrameHandler(stateManager.monitor_region, stateManager.FPS)
     try:
         # used to record the time when we processed last frame
@@ -66,9 +67,9 @@ def play(model_path: str):
         cv2.namedWindow('player')
 
         # Generate an array of empty histories
-        output_template = [1 for _ in dataEncoder.KEY_TO_CODE_MAP]
-        output_template.extend(dataEncoder.mouse_to_classification([300,300]))
-        input_history = [output_template[:] for _ in range(dataEncoder.HISTORY_LENGTH)]
+        output_template = [1 for _ in keybindHandler.ACTION_TO_BUTTON]
+        output_template.extend(keybindHandler.mouse_to_classification([300,300]))
+        input_history = [output_template[:] for _ in range(stateManager.HISTORY_LENGTH)]
 
         # used to record the time at which we processed current frame
         new_frame_time = 0
@@ -91,17 +92,17 @@ def play(model_path: str):
 
                     #print(output)
 
-                    keys_output, mousex_output, mousey_output = dataEncoder.output_to_mappings(output)
-                    keys = [1 if x > dataEncoder.KEY_THRESHOLD else 0 for x in keys_output]
+                    keys_output, mousex_output, mousey_output = keybindHandler.output_to_mappings(output)
+                    keys = [1 if x > stateManager.KEY_THRESHOLD else 0 for x in keys_output]
 
                     mousex_ind = np.argmax(mousex_output)
                     mousey_ind = np.argmax(mousey_output)
 
                     input_history.pop(0)
                     keys_h = keys[:]
-                    mousex_h = [0 for _ in dataEncoder.MOUSE_CLASSES]
+                    mousex_h = [0 for _ in keybindHandler.MOUSE_CLASSES]
                     mousex_h[mousex_ind] = 1
-                    mousey_h = [0 for _ in dataEncoder.MOUSE_CLASSES]
+                    mousey_h = [0 for _ in keybindHandler.MOUSE_CLASSES]
                     mousey_h[mousey_ind] = 1
                     keys_h.extend(mousex_h)
                     keys_h.extend(mousey_h)
@@ -112,17 +113,12 @@ def play(model_path: str):
 
 
                     printmouse = f"Mouse: ({int(mousex)}, {int(mousey)})"
-                    for i in range(len(keys)):
-                        key = dataEncoder.CODE_TO_KEY_MAP[i]
-                        if keys[i] == 1 and stateManager.let_go_of_my_keys_please[i] == 0:
-                            keyboard.press(key)
-                        elif keys[i] == 0 and stateManager.let_go_of_my_keys_please[i] == 1:
-                            keyboard.release(key)
+                    
 
-                    printkey = f"Keys: {str(stateManager.get_your_keys_pressed(keys))}"
+                    printkey = f"Keys: {str(keybindHandler.get_your_keys_pressed(keys))}"
 
                     # Record keys pressed
-                    stateManager.update_pressed_keys(keys)
+                    keybindHandler.update_pressed_keys(keys)
 
                     #print(f"Moving Mouse: ({int(mousex)}, {int(mousey)})")
                     x = int(mousex)
@@ -152,7 +148,7 @@ def play(model_path: str):
                     cv2.putText(img, printmouse, (7, 85), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
                 
                 else:
-                    stateManager.let_go_of_pressed_keys(keyboard)
+                    keybindHandler.release_pressed_buttons(keyboard, mouse)
 
                 cv2.imshow('player', img)
 
@@ -165,5 +161,6 @@ def play(model_path: str):
         print(e)
     finally:
         #d.stop()
+        keybindHandler.release_pressed_buttons(keyboard, mouse)
         cv2.destroyAllWindows()
         pass

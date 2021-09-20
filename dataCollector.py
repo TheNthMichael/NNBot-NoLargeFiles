@@ -1,6 +1,4 @@
 import numpy as np
-import dataEncoder
-import math
 import cv2
 import time
 import os

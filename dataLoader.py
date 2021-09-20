@@ -4,18 +4,9 @@ import pickle
 import numpy as np
 import dataEncoder
 import stateManager
-import cv2
+import keybindHandler
 
 class DataLoader:
-    class NormalizedAttributes:
-        def __init__(self) -> None:
-            self.xMouseMin = float('inf')
-            self.xMouseMax = float('-inf')
-            self.yMouseMin = float('inf')
-            self.yMouseMax = float('-inf')
-            self.imageValMin = 0
-            self.imageValMax = 1
-
     """Creates a new instance of the data loader.
     
     normalize is a flag which when set will normalize all data points to a range 0, 1.
@@ -28,33 +19,10 @@ class DataLoader:
         self.the_file = open(self.path, 'rb')
         self.normalize = normalize
         self.chunk_size = chunk_size
-        self.map_mouse_to_sigmoid = None
 
-        # Our model will hold data for approx 12 frames of a key being held down.
-        # after this point, it will just be flagged as "key has been down as long
-        # as I've known."
-        self.look_back_time = dataEncoder.HISTORY_LENGTH
-        # As x approaches infinity norm_map approaches 1.
-        self.zero_map = np.vectorize(lambda x: 1 - math.exp(-x/self.look_back_time))
-        # As x approaches infinity invnorm_map approaches 0.
-        self.one_map = np.vectorize(lambda x: math.exp(-x/self.look_back_time))
+        self.look_back_time = stateManager.HISTORY_LENGTH
 
-        self.vec_linmap = np.vectorize(dataEncoder.linmap)
-
-        self.forget_curve = np.vectorize(lambda c, t: (1 - c) * self.vec_linmap(self.zero_map(t), 0, 1, 0, 0.5) + c * self.vec_linmap(self.one_map(t), 1, 0, 1, 0.5))
         self.consumed_all_samples = False
-        if self.normalize:
-            self.get_normalize_attributes()
-
-
-    def get_normalize_attributes(self):
-        self._norm_attrs = self.NormalizedAttributes()
-        self._norm_attrs.imageValMin = 0
-        self._norm_attrs.imageValMax = 255
-
-        self.map_mouse_to_sigmoid = lambda x, y: (dataEncoder.linmap(x,\
-           self._norm_attrs.xMouseMin, self._norm_attrs.xMouseMax, 0, 1),\
-               dataEncoder.linmap(y, self._norm_attrs.yMouseMin, self._norm_attrs.yMouseMax, 0, 1))
         
 
     """
@@ -75,18 +43,21 @@ class DataLoader:
 
         training_outputs = []
 
-        input_history = [dataEncoder.BLANK_CLASS_OUTPUT[:] for _ in range(dataEncoder.HISTORY_LENGTH)]
+        # Generate an array of empty histories
+        output_template = [1 for _ in keybindHandler.ACTION_TO_BUTTON]
+        output_template.extend(keybindHandler.mouse_to_classification([300,300]))
+        input_history = [output_template[:] for _ in range(stateManager.HISTORY_LENGTH)]
 
         if not chunk_size:
-            chunk_size = 10000000 # Good luck collecting more samples than this
+            chunk_size =  stateManager.MAX_CHUNK_SIZE
         print(f"Getting dataset with chunksize: {chunk_size}")
         try:
-            for i in range(chunk_size):
+            for _ in range(chunk_size):
                 sample = pickle.load(self.the_file)
                 mouse = sample.raw_mouse
                 keys = sample.inputs
                 frame = sample.frame
-                mouse_encoded = dataEncoder.mouse_to_classification(mouse)
+                mouse_encoded = keybindHandler.mouse_to_classification(mouse)
                 input_history_sample = np.append(keys, mouse_encoded)
                 input_history.pop(0)
                 input_history.append(input_history_sample[:])

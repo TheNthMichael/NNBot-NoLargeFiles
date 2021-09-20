@@ -71,9 +71,6 @@ MOUSE_BUTTONS_RECORDING = {
     str(Button.right).lower(): "rmouse"
 }
 
-# Create an array of all zeros for every possible button action
-EMPTY_BUTTONS_ONEHOT = [0 for _ in range(len(ACTION_TO_BUTTON))]
-
 # Define the mouse classes
 MOUSE_CLASSES = [-1, -3, -5, -10, -20, -30, -60, -100, -200, -300]
 MOUSE_CLASSES.extend([-x for x in MOUSE_CLASSES])
@@ -81,6 +78,11 @@ MOUSE_CLASSES.append(0)
 MOUSE_CLASSES.sort()
 
 MOUSE_CLASS_SIZE = len(MOUSE_CLASSES)
+
+# Create an array of all zeros for every possible button action
+EMPTY_BUTTONS_ONEHOT = [0 for _ in range(len(ACTION_TO_BUTTON))]
+EMPTY_BUTTONS_ONEHOT.extend([0 for _ in range(len(MOUSE_CLASSES))])
+EMPTY_BUTTONS_ONEHOT.extend([0 for _ in range(len(MOUSE_CLASSES))])
 
 # Handle Recovery
 buttons_pressed_by_code = [0 for _ in ONEHOTINDEX_TO_BUTTON]
