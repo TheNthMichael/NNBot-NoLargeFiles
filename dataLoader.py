@@ -2,7 +2,6 @@ import os
 import math
 import pickle
 import numpy as np
-import dataEncoder
 import stateManager
 import keybindHandler
 

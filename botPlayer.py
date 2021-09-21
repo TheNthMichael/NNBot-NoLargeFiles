@@ -4,7 +4,6 @@ import cv2
 import ctypes
 import time
 import numpy as np
-import dataEncoder
 from pynput.keyboard import Key, Controller as KeyController, Listener as KeyListener
 from pynput.mouse import Listener as MouseListener, Controller as MouseController
 import stateManager

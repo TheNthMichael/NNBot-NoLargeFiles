@@ -1,8 +1,6 @@
 # This code was yoinked and reworked from here https://drive.google.com/file/d/1MOVhZhn0yv-Ngp0xK9jly-b_Ttx_2Tf7/view
 # Seems to work on random inputs and outputs. Trimmed out a branch of this model that is not in my use case.
 # Removed some weird loss function that I'm fairly certain was custom made for the authors expected outputs.
-
-from dataEncoder import BLANK_CLASS_OUTPUT
 import tensorflow as tf
 import numpy as np
 import keras
@@ -16,6 +14,7 @@ import keras.metrics
 from keras.callbacks import TensorBoard, EarlyStopping
 import keras.backend as K
 from dataLoader import DataLoader
+import keybindHandler
 
 
 
@@ -94,7 +93,7 @@ def re_train(path, model_load_name:str, chunk_size:int=None, model_save_name:str
 
     opt = tf.keras.optimizers.Adam(learning_rate=1e-4, decay=1e-5)
     def my_loss(targets, logits):
-        weights = np.array([0.8 for _ in range(len(BLANK_CLASS_OUTPUT))])
+        weights = np.array([0.8 for _ in range(len(keybindHandler.EMPTY_CLASSES_ONEHOT))])
         return K.sum(targets * -K.log(1 - logits + 1e-10) * weights + (1 - targets) * -K.log(1 - logits + 1e-10) * (1 - weights), axis=-1)
 
     model = keras.models.load_model(model_load_name, custom_objects={"f1": f1, "my_loss": my_loss})

@@ -2,7 +2,7 @@
 # Seems to work on random inputs and outputs. Trimmed out a branch of this model that is not in my use case.
 # Removed some weird loss function that I'm fairly certain was custom made for the authors expected outputs.
 
-from keybindHandler import EMPTY_BUTTONS_ONEHOT, ONEHOTINDEX_TO_BUTTON
+import keybindHandler
 import tensorflow as tf
 import numpy as np
 import keras
@@ -133,11 +133,11 @@ def train(path, chunk_size:int=None, model_save_name:str=None):
     z = Dropout(dropout)(z)
 
     # Output Layer
-    z = Dense(len(ONEHOTINDEX_TO_BUTTON), activation="sigmoid")(z)
+    z = Dense(len(keybindHandler.EMPTY_CLASSES_ONEHOT), activation="sigmoid")(z)
     model = Model(inputs=[y.input, w.input], outputs=z)
     opt = tf.keras.optimizers.Adam(learning_rate=1e-4, decay=1e-5)
     def my_loss(targets, logits):
-        weights = np.array([0.8 for _ in range(len(ONEHOTINDEX_TO_BUTTON))])
+        weights = np.array([0.8 for _ in range(len(keybindHandler.EMPTY_CLASSES_ONEHOT))])
         return K.sum(targets * -K.log(1 - logits + 1e-10) * weights + (1 - targets) * -K.log(1 - logits + 1e-10) * (1 - weights), axis=-1)
 
     #opt = keras.optimizers.Adam(lr=1e-4, decay=1e-5)
