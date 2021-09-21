@@ -1,5 +1,16 @@
-is_recording = False
-is_not_exiting = True
+from threading import Event, Lock
+
+is_recording = Event()
+is_not_exiting = Event()
+
+def toggle_recording():
+    if is_recording.is_set():
+        is_recording.clear()
+    else:
+        is_recording.set()
+
+#is_recording = False
+#is_not_exiting = True
 
 screen_cap_scale = 8
 

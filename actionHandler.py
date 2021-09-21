@@ -47,10 +47,12 @@ import keybindHandler
 >>> smooth(50,50,1/20)
 >>> smooth(50,50,1/20)
 """
-# This will be run in another thread outside the main loop so that the main loop can control when frames are pulled
+"""This class handles the movement movement actions of the bot.
+
+The class uses ctypes for mouse move events and pynput for keyboard and mouse button presses."""
 class ActionHandler:
     def __init__(self, fps) -> None:
-        # reset timer otherwise enjoy massive delays with time.sleep()
+        # reset timer otherwise enjoy massive delays with time.sleep() I cannot stress the importance of this.
         timeBeginPeriod = ctypes.windll.winmm.timeBeginPeriod
         timeBeginPeriod(1)
         self.fps = fps
@@ -89,6 +91,10 @@ class ActionHandler:
         self.realy = 0
         time.sleep(self.interval)
 
+    """Set the actions for the actionHandler to update over the span of 1/fps.
+    
+    Button presses are passed in one-hot format and mouse movement is passed
+    as dx, dy where the change is for the duration of a frame aka 1/fps."""
     def set_controller_action(self, actions_onehot, mousex, mousey):
         self.action_onehot = actions_onehot
         self.mouse_x = mousex
@@ -105,14 +111,22 @@ class ActionHandler:
     def release_pressed_buttons(self):
         keybindHandler.release_pressed_buttons(self.keyboard, self.mouse)
 
+"""A thread for running the Mouse and Keyboard I/O.
 
-def action_handler_thread(action_handler: ActionHandler, exit_event, data_lock=None):
+Mouse inputs are interpolated over the expected fps.
+This may lead to slightly inaccurate movements.
+This can be fixed by creating your ActionHandler with an fps less than the expected fps."""
+def action_handler_thread(action_handler: ActionHandler, exit_event, recording_event):
     try:
         while not exit_event.is_set():
-            action_handler.update()
+            # Here we disable updating.
+            if recording_event.is_set():
+                action_handler.update()
+            else:
+                action_handler.release_pressed_buttons()
     except Exception as e:
         print(e)
-        exit_event.set()
     finally:
+        exit_event.set()
         action_handler.release_pressed_buttons()
         print("Closing frame_handler_thread...")

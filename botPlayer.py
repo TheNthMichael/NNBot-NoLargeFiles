@@ -15,24 +15,29 @@ import keras.backend as K
 import random
 import tensorflow as tf
 
+"""Handle mouse button presses and releases."""
 def on_click_handler(x, y, button, pressed):
     print(f'{str(button)} is pressed {pressed} at {(x,y)}')
-    return stateManager.is_not_exiting
+    return stateManager.is_not_exiting.is_set()
 
+"""Handle keyboard button presses."""
 def on_press_handler(key):
-    return stateManager.is_not_exiting
+    return stateManager.is_not_exiting.is_set()
 
+"""Handle keyboard button releases.
+Handles the user input for state management. (toggle recording, set exit event)"""
 def on_release_handler(key):
     if key == Key.f3:
-        stateManager.is_recording = not stateManager.is_recording
-        return stateManager.is_not_exiting
+        stateManager.toggle_recording()
+        return stateManager.is_not_exiting.is_set()
     if key == Key.esc:
-        stateManager.is_not_exiting = not stateManager.is_not_exiting
-        return stateManager.is_not_exiting 
-    return stateManager.is_not_exiting
+        stateManager.is_not_exiting.set()
+        return stateManager.is_not_exiting.is_set()
+    return stateManager.is_not_exiting.is_set()
 
+"""Random loss function not used due to classes not needing to be weighted separately."""
 def my_loss(targets, logits):
-    weights = np.array([0.9 for _ in range(len(dataEncoder.BLANK_CLASS_OUTPUT))])
+    weights = np.array([0.9 for _ in range(len(keybindHandler.EMPTY_CLASSES_ONEHOT))])
     return K.sum(targets * -K.log(1 - logits + 1e-10) * weights + (1 - targets) * -K.log(1 - logits + 1e-10) * (1 - weights), axis=-1)
 
 # This metric was taken from here: https://drive.google.com/file/d/1MOVhZhn0yv-Ngp0xK9jly-b_Ttx_2Tf7/view
@@ -52,6 +57,7 @@ def f1(y_true, y_pred):
     recall = recall(y_true, y_pred)
     return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
 
+"""Start the model and wait for user input to toggle 'recording' event which is used to toggle the bot here."""
 def play(model_path: str):
     
     gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -62,9 +68,8 @@ def play(model_path: str):
     mouse = MouseController()
     frame_handler = FrameHandler(stateManager.monitor_region, stateManager.FPS)
     action_handler = actionHandler.ActionHandler(stateManager.FPS)
-    exit_event = threading.Event()
     data_lock = threading.Lock()
-    action_thread = threading.Thread(target=actionHandler.action_handler_thread, args=(action_handler, exit_event, data_lock))
+    action_thread = threading.Thread(target=actionHandler.action_handler_thread, args=(action_handler, stateManager.is_not_exiting, stateManager.is_recording))
     try:
         # used to record the time when we processed last frame
         prev_frame_time = 0

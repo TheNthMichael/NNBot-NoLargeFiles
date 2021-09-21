@@ -81,8 +81,9 @@ MOUSE_CLASS_SIZE = len(MOUSE_CLASSES)
 
 # Create an array of all zeros for every possible button action
 EMPTY_BUTTONS_ONEHOT = [0 for _ in range(len(ACTION_TO_BUTTON))]
-EMPTY_BUTTONS_ONEHOT.extend([0 for _ in range(len(MOUSE_CLASSES))])
-EMPTY_BUTTONS_ONEHOT.extend([0 for _ in range(len(MOUSE_CLASSES))])
+EMPTY_CLASSES_ONEHOT = [0 for _ in range(len(ACTION_TO_BUTTON))]
+EMPTY_CLASSES_ONEHOT.extend([0 for _ in range(len(MOUSE_CLASSES))])
+EMPTY_CLASSES_ONEHOT.extend([0 for _ in range(len(MOUSE_CLASSES))])
 
 # Handle Recovery
 buttons_pressed_by_code = [0 for _ in ONEHOTINDEX_TO_BUTTON]
