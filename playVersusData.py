@@ -1,6 +1,8 @@
+from os import stat
+from actionHandler import action_handler_thread
+import keybindHandler
 import cv2
 import pickle
-import dataEncoder
 import numpy as np
 import stateManager
 import time
@@ -10,7 +12,7 @@ import random
 import tensorflow as tf
 
 def my_loss(targets, logits):
-    weights = np.array([0.9 for _ in range(len(dataEncoder.BLANK_CLASS_OUTPUT))])
+    weights = np.array([0.9 for _ in range(len(keybindHandler.EMPTY_CLASSES_ONEHOT))])
     return K.sum(targets * -K.log(1 - logits + 1e-10) * weights + (1 - targets) * -K.log(1 - logits + 1e-10) * (1 - weights), axis=-1)
 
 # This metric was taken from here: https://drive.google.com/file/d/1MOVhZhn0yv-Ngp0xK9jly-b_Ttx_2Tf7/view
@@ -31,33 +33,36 @@ def f1(y_true, y_pred):
     return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
 
 
-the_file = open("TestData/dataset_aottg_forest.pickle", "rb")
+the_file = open("TestData/aottg_overlay_test.pickle", "rb")
 
-the_model = "Models/km_aottg_forest.model"
+the_model = "Models/km_aottg_ov.model"
 
 model = keras.models.load_model(the_model, custom_objects={"f1": f1, "my_loss": my_loss})
 
 # Generate an array of empty histories
-output_template = [1 for _ in dataEncoder.KEY_TO_CODE_MAP]
-output_template.extend(dataEncoder.mouse_to_classification([300,300]))
-input_history_bot = [output_template[:] for _ in range(dataEncoder.HISTORY_LENGTH)]
+output_template = [1 for _ in keybindHandler.ACTION_TO_BUTTON]
+output_template.extend(keybindHandler.mouse_to_classification([300,300]))
+input_history_bot = [output_template[:] for _ in range(stateManager.HISTORY_LENGTH)]
 
 training_inputs_frames = []
 training_inputs_histories = []
 
 training_outputs = []
 
-input_history = [dataEncoder.BLANK_CLASS_OUTPUT[:] for _ in range(dataEncoder.HISTORY_LENGTH)]
+input_history = [keybindHandler.EMPTY_CLASSES_ONEHOT[:] for _ in range(stateManager.HISTORY_LENGTH)]
 
-chunk_size = 10000000 # Good luck collecting more samples than this
+real_mouse = []
+
+chunk_size = stateManager.MAX_CHUNK_SIZE # Good luck collecting more samples than this
 print(f"Getting dataset with chunksize: {chunk_size}")
 try:
     for i in range(chunk_size):
         sample = pickle.load(the_file)
         mouse = sample.raw_mouse
+        real_mouse.append(mouse)
         keys = sample.inputs
         frame = sample.frame
-        mouse_encoded = dataEncoder.mouse_to_classification(mouse)
+        mouse_encoded = keybindHandler.mouse_to_classification(mouse)
         input_history_sample = np.append(keys, mouse_encoded)
         input_history.pop(0)
         input_history.append(input_history_sample[:])
@@ -86,57 +91,55 @@ for i in range(len(training_inputs_frames)):
 
     #print(output)
 
-    keys_output, mousex_output, mousey_output = dataEncoder.output_to_mappings(output)
+    keys_output, mousex_output, mousey_output = keybindHandler.output_to_mappings(output)
     #keys_bot = [1 if x >= dataEncoder.KEY_THRESHOLD else 0 for x in keys_output]
-    keys_bot = [1 if x > random.uniform(0, 0.8) else 0 for x in keys_output]
+    keys_bot = [1 if x > stateManager.KEY_THRESHOLD else 0 for x in keys_output]
 
     mousex_ind = np.argmax(mousex_output)
     mousey_ind = np.argmax(mousey_output)
 
     input_history_bot.pop(0)
     keys_h = keys_bot[:]
-    mousex_h = [0 for _ in dataEncoder.MOUSE_CLASSES]
+    mousex_h = [0 for _ in keybindHandler.MOUSE_CLASSES]
     mousex_h[mousex_ind] = 1
-    mousey_h = [0 for _ in dataEncoder.MOUSE_CLASSES]
+    mousey_h = [0 for _ in keybindHandler.MOUSE_CLASSES]
     mousey_h[mousey_ind] = 1
     bot_output = np.append(keys_h, mousex_h)
     bot_output = np.append(bot_output, mousey_h)
     input_history_bot.append(bot_output)
 
-    mousex = dataEncoder.MOUSE_CLASSES[mousex_ind]
-    mousey = dataEncoder.MOUSE_CLASSES[mousey_ind]
+    mousex = keybindHandler.MOUSE_CLASSES[mousex_ind]
+    mousey = keybindHandler.MOUSE_CLASSES[mousey_ind]
 
 
     #printmouse = f"Mouse: ({int(mousex)}, {int(mousey)})"
     # End Bot
-
-    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
     frame = cv2.resize(frame, (1920, 1080))
     inputshistory = training_inputs_histories[i]
 
     j = 0
     cv2.putText(frame, f"Human", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
     j += 1
-    cv2.putText(frame, f"history[map]: [w a s d q e ^ _], {dataEncoder.MOUSE_CLASSES}, {dataEncoder.MOUSE_CLASSES}", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
+    cv2.putText(frame, f"history[map]: {keybindHandler.print_buttons()}, {keybindHandler.MOUSE_CLASSES}, {keybindHandler.MOUSE_CLASSES}", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
     j += 1
     for input in range(len(inputshistory)):
-        keys, mousex, mousey = dataEncoder.output_to_mappings(inputshistory[input])
-        cv2.putText(frame, f"history[t-{dataEncoder.HISTORY_LENGTH - input}]: {keys}, {mousex}, {mousey} | Mouse: ({dataEncoder.MOUSE_CLASSES[np.argmax(mousex)]}, {dataEncoder.MOUSE_CLASSES[np.argmax(mousey)]})", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
+        keys, mousex, mousey = keybindHandler.output_to_mappings(inputshistory[input])
+        cv2.putText(frame, f"history[t-{stateManager.HISTORY_LENGTH - input}]: {keys}, {mousex}, {mousey} | Mouse: ({keybindHandler.MOUSE_CLASSES[np.argmax(mousex)]}, {keybindHandler.MOUSE_CLASSES[np.argmax(mousey)]}) | Real Mouse: ({real_mouse[i][0]}, {real_mouse[i][1]})", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
         j += 1
 
     j += 1
     cv2.putText(frame, f"Bot", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
     j += 1
-    cv2.putText(frame, f"history[map]: [w a s d q e ^ _], {dataEncoder.MOUSE_CLASSES}, {dataEncoder.MOUSE_CLASSES}", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
+    cv2.putText(frame, f"history[map]: {keybindHandler.print_buttons()}, {keybindHandler.MOUSE_CLASSES}, {keybindHandler.MOUSE_CLASSES}", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
     j += 1
     for input in range(len(input_history_bot)):
-        keys, mousex, mousey = dataEncoder.output_to_mappings(input_history_bot[input])
-        cv2.putText(frame, f"history[t-{dataEncoder.HISTORY_LENGTH - input}]: {keys}, {mousex}, {mousey} | Mouse: ({dataEncoder.MOUSE_CLASSES[np.argmax(mousex)]}, {dataEncoder.MOUSE_CLASSES[np.argmax(mousey)]})", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
+        keys, mousex, mousey = keybindHandler.output_to_mappings(input_history_bot[input])
+        cv2.putText(frame, f"history[t-{stateManager.HISTORY_LENGTH - input}]: {keys}, {mousex}, {mousey} | Mouse: ({keybindHandler.MOUSE_CLASSES[np.argmax(mousex)]}, {keybindHandler.MOUSE_CLASSES[np.argmax(mousey)]})", (7, 25 + (j * 10)), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
         j += 1
     
     for input in range(len(input_history_bot)):
-        keys, mousex, mousey = dataEncoder.output_to_mappings(inputshistory[input])
-        keys_b, mousex_b, mousey_b = dataEncoder.output_to_mappings(input_history_bot[input])
+        keys, mousex, mousey = keybindHandler.output_to_mappings(inputshistory[input])
+        keys_b, mousex_b, mousey_b = keybindHandler.output_to_mappings(input_history_bot[input])
         human = inputshistory[input]
         bot = input_history_bot[input]
         for i in range(len(human)):
@@ -156,6 +159,6 @@ for i in range(len(training_inputs_frames)):
 
     if cv2.waitKey(25) & 0xFF == ord('p'):
         cv2.destroyAllWindows()
-        stateManager.is_not_exiting = False
+        stateManager.is_exiting.set()
         break
 print(f"Total Accuracy: {num_correct} / {num_total} ({int(num_correct * 100 / num_total)} %)")

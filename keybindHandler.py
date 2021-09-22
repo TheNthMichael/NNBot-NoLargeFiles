@@ -13,7 +13,7 @@ def create_action_to_button(config_path: str) -> dict:
         if list_config.count(config[x]) > 1:
             print("Error: found a duplicate input being used in config.json.")
             print(f"Please rebind {x} to a key other than {config[x]}")
-            stateManager.is_not_exiting = False
+            stateManager.is_exiting.set()
             #sys.exit()
     # Verify that this is correct
     assert([type(x) is str and type(config[x]) is str for x in config])
@@ -29,6 +29,9 @@ def create_button_to_onehot(config_path: str) -> dict:
         button2onehot[config[x]] = i
         i += 1
     return button2onehot
+
+def print_buttons():
+    return str([x for x in BUTTON_TO_ACTION])
 
 ACTION_TO_BUTTON = create_action_to_button(".\\Resources\\config.json")
 BUTTON_TO_ACTION = {v: k for k, v in ACTION_TO_BUTTON.items()}
@@ -72,7 +75,7 @@ MOUSE_BUTTONS_RECORDING = {
 }
 
 # Define the mouse classes
-MOUSE_CLASSES = [-1, -3, -5, -10, -20, -30, -60, -100, -200, -300]
+MOUSE_CLASSES = [-1, -3, -5, -8, -10, -15, -20, -30, -60, -100, -200, -300]
 MOUSE_CLASSES.extend([-x for x in MOUSE_CLASSES])
 MOUSE_CLASSES.append(0)
 MOUSE_CLASSES.sort()
@@ -186,27 +189,27 @@ def update_button_presses(keyboard, mouse, buttons_encoded):
     for i in range(len(buttons_encoded)):
         button = ONEHOTINDEX_TO_BUTTON[i]
         # Attempt to press if not already pressed
-        if buttons_encoded[i] == 1 and buttons_pressed_by_code[i] != 1:
+        if buttons_encoded[i] == 1 and buttons_pressed_by_code[i] == 0:
             if len(button) == 1:
-                # keypress
+                buttons_pressed_by_code[i] = 1
                 keyboard.press(button)
             elif button in SPECIAL_KEYS:
+                buttons_pressed_by_code[i] = 1
                 keyboard.press(SPECIAL_KEYS[button])
             elif button in MOUSE_BUTTONS:
+                buttons_pressed_by_code[i] = 1
                 mouse.press(MOUSE_BUTTONS[button])
-            # Record button
-            buttons_pressed_by_code[i] = 1
         # Attempt to release if not already released
-        elif buttons_pressed_by_code[i] != 0:
+        elif buttons_encoded[i] == 0 and buttons_pressed_by_code[i] == 1:
             if len(button) == 1:
-                # keypress
+                buttons_pressed_by_code[i] = 0
                 keyboard.release(button)
             elif button in SPECIAL_KEYS:
+                buttons_pressed_by_code[i] = 0
                 keyboard.release(SPECIAL_KEYS[button])
             elif button in MOUSE_BUTTONS:
+                buttons_pressed_by_code[i] = 0
                 mouse.release(MOUSE_BUTTONS[button])
-            # Record button    
-            buttons_pressed_by_code[i] = 0
 
 """Takes in your controllers and releases any buttons pressed on them.
 """

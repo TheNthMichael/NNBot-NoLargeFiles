@@ -1,7 +1,8 @@
+from re import A
 import threading
 import keras
 import cv2
-import ctypes
+import traceback
 import time
 import numpy as np
 from pynput.keyboard import Key, Controller as KeyController, Listener as KeyListener
@@ -17,22 +18,22 @@ import tensorflow as tf
 """Handle mouse button presses and releases."""
 def on_click_handler(x, y, button, pressed):
     print(f'{str(button)} is pressed {pressed} at {(x,y)}')
-    return stateManager.is_not_exiting.is_set()
+    return not stateManager.is_exiting.is_set()
 
 """Handle keyboard button presses."""
 def on_press_handler(key):
-    return stateManager.is_not_exiting.is_set()
+    return not stateManager.is_exiting.is_set()
 
 """Handle keyboard button releases.
 Handles the user input for state management. (toggle recording, set exit event)"""
 def on_release_handler(key):
     if key == Key.f3:
         stateManager.toggle_recording()
-        return stateManager.is_not_exiting.is_set()
+        not stateManager.is_exiting.is_set()
     if key == Key.esc:
-        stateManager.is_not_exiting.set()
-        return stateManager.is_not_exiting.is_set()
-    return stateManager.is_not_exiting.is_set()
+        stateManager.is_exiting.set()
+        return not stateManager.is_exiting.is_set()
+    return not stateManager.is_exiting.is_set()
 
 """Random loss function not used due to classes not needing to be weighted separately."""
 def my_loss(targets, logits):
@@ -63,12 +64,10 @@ def play(model_path: str):
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
     model = keras.models.load_model(model_path, custom_objects={"f1": f1, "my_loss": my_loss})
-    keyboard = KeyController()
-    mouse = MouseController()
     frame_handler = FrameHandler(stateManager.monitor_region, stateManager.FPS)
-    action_handler = actionHandler.ActionHandler(stateManager.FPS)
-    data_lock = threading.Lock()
-    action_thread = threading.Thread(target=actionHandler.action_handler_thread, args=(action_handler, stateManager.is_not_exiting, stateManager.is_recording))
+    action_handler = actionHandler.ActionHandler(500)
+    #data_lock = threading.Lock()
+    action_thread = threading.Thread(target=actionHandler.action_handler_thread, args=(action_handler, stateManager.is_exiting, stateManager.is_recording))
     try:
         # used to record the time when we processed last frame
         prev_frame_time = 0
@@ -82,15 +81,15 @@ def play(model_path: str):
 
         # used to record the time at which we processed current frame
         new_frame_time = 0
-        action_thread.start()
         with KeyListener(on_press = on_press_handler,
                 on_release = on_release_handler) as key_listener:
-            while stateManager.is_not_exiting:
+            action_thread.start()
+            while not stateManager.is_exiting.is_set():
                 frame_handler.update()
                 img = frame_handler.get_current_frame()
                 img = cv2.resize(img, stateManager.screen_cap_sizes)
                 
-                if stateManager.is_recording:
+                if stateManager.is_recording.is_set():
                     
                     X2 = [(img / 255) for i in range(1)]
                     X2 = np.asarray(X2)
@@ -122,10 +121,14 @@ def play(model_path: str):
                     mousey = keybindHandler.MOUSE_CLASSES[mousey_ind]
 
                     # Update the keys and mouse inputs - May need a data lock here to avoid issues with concurrency.
-                    action_handler.set_controller_action(keys, mousex, mousey)
+                    action_handler.set_controller_action(keys, mousex * 100, mousey * 100)
+                    #for i in range(stateManager.FPS):
+                        #action_handler.update()    
 
 
                     printmouse = f"Mouse: ({int(mousex)}, {int(mousey)})"
+
+                    print(printmouse)
                     
 
                     printkey = f"Keys: {str(keybindHandler.get_your_keys_pressed(keys))}"
@@ -139,7 +142,7 @@ def play(model_path: str):
                     # fps will be number of frame processed in given time frame
                     # since their will be most of time error of 0.001 second
                     # we will be subtracting it to get more accurate result
-                    fps = 1/(new_frame_time-prev_frame_time)
+                    fps = 1/(max(new_frame_time-prev_frame_time, 0.000000001))
                     prev_frame_time = new_frame_time
 
                     # converting the fps into integer
@@ -153,19 +156,28 @@ def play(model_path: str):
                     cv2.putText(img, printmouse, (7, 85), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255), 1, cv2.LINE_AA)
                 
                 else:
-                    keybindHandler.release_pressed_buttons(keyboard, mouse)
+                    # time when we finish processing for this frame
+                    new_frame_time = time.time()
+
+                    # fps will be number of frame processed in given time frame
+                    # since their will be most of time error of 0.001 second
+                    # we will be subtracting it to get more accurate result
+                    fps = 1/(max(new_frame_time-prev_frame_time, 0.000000001))
+                    prev_frame_time = new_frame_time
+                    print(f"FPS: {fps}")
 
                 cv2.imshow('player', img)
 
-                if cv2.waitKey(1) & 0xFF == ord('p'):
+                if cv2.waitKey(5) & 0xFF == ord('p'):
                     cv2.destroyAllWindows()
-                    stateManager.is_not_exiting = False
+                    stateManager.is_exiting.set()
                     break
             key_listener.join()
     except Exception as e:
-        print(e)
+        print(f"Error in BotPlayer: {e}")
+        traceback.print_exc()
     finally:
-        #d.stop()
-        keybindHandler.release_pressed_buttons(keyboard, mouse)
         cv2.destroyAllWindows()
-        pass
+        action_handler.release_pressed_buttons()
+        action_thread.join()
+        stateManager.is_exiting.set()

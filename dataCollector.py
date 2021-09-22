@@ -1,3 +1,5 @@
+from threading import Thread
+from cv2 import data
 import numpy as np
 import cv2
 import time
@@ -5,10 +7,12 @@ import os
 import pickle
 import keybindHandler
 import stateManager
+import traceback
 from datetime import datetime
 from pynput.keyboard import Key, Listener as KeyListener
 from pynput.mouse import Listener as MouseListener
 from frameHandler import *
+from overlay import Overlay
 
 """Handler for key presses.
 
@@ -21,25 +25,25 @@ def on_press_handler(key):
 Listens for commands that signal to start recording or to exit the program."""
 def on_release_handler(key):
     if key == Key.f3:
-        stateManager.is_recording = not stateManager.is_recording
-        return stateManager.is_not_exiting
+        stateManager.toggle_recording()
+        return not stateManager.is_exiting.is_set()
     if key == Key.esc:
-        stateManager.is_not_exiting = not stateManager.is_not_exiting
-        return stateManager.is_not_exiting 
+        stateManager.is_exiting.set()
+        return not stateManager.is_exiting.is_set()
     keybindHandler.record_input(key, pressed=False)
-    return stateManager.is_not_exiting
+    return not stateManager.is_exiting.is_set()
 
 """Records the movement of the mouse in pixels through the KeybindHandler. (Frame independent)"""
 def on_move_handler(x, y):
     keybindHandler.last_mouse_moved_x = x
     keybindHandler.last_mouse_moved_y = y
-    return stateManager.is_not_exiting
+    return not stateManager.is_exiting.is_set()
 
 """Records mouse button clicks through the KeybindHandler."""
 def on_click_handler(x, y, button, pressed):
     keybindHandler.record_input(button, pressed=pressed)
     print(f'{str(button)} is pressed {pressed} at {(x,y)}')
-    return stateManager.is_not_exiting
+    return not stateManager.is_exiting.is_set()
 
 """Format for each sample in our training set.
 
@@ -53,9 +57,18 @@ class TrainingSample:
         self.inputs = inputs
         self.raw_mouse = raw_mouse
 
+def overlay_close(p0):
+        stateManager.is_exiting.set()
+
+def overlay_text():
+        return DataCollector.overlay_text
+
 """A class for handling the collection of frames matched with user inputs at the time of the frame
 or for a duration between frames."""
 class DataCollector:
+    overlay = None
+    overlay_text = None
+
     """Creates the folder and opens the file for dumping objects into.
     Creates an instance of a FrameHandler."""
     def __init__(self, dataset_path:str=None) -> None:
@@ -70,6 +83,10 @@ class DataCollector:
                 f"dataset{datetime.now().strftime('%Y%m%d%H%M%S')}.pickle")
         self.dataset_file = open(self.dataset_path, "wb")
         self.frameHandler = FrameHandler(stateManager.monitor_region, stateManager.FPS)
+        """if DataCollector.overlay is None:
+            DataCollector.overlay = Overlay(overlay_close, overlay_text)
+        if DataCollector.overlay_text is None:
+            DataCollector.overlay_text = "WAITING..." """
     
     """Dumps the TrainingSample object to the pickle file.
     These objects are appended to the same file and can be read
@@ -92,7 +109,7 @@ class DataCollector:
             with KeyListener(on_press = on_press_handler,
                 on_release = on_release_handler) as key_listener:
                 with MouseListener(on_move = on_move_handler, on_click = on_click_handler) as mouse_listener:
-                    while stateManager.is_not_exiting:
+                    while not stateManager.is_exiting.is_set():
                         self.frameHandler.update()
                         img = self.frameHandler.get_current_frame()
                         img = cv2.resize(img, stateManager.screen_cap_sizes)
@@ -137,9 +154,12 @@ class DataCollector:
 
                         fps = f"fps: {fps}"
 
+                        #DataCollector.overlay_text = f"FPS: {fps} | Recording: {stateManager.is_recording.is_set()} |Keys Pressed: {key} | Mouse: {mouse}"
+                        #DataCollector.overlay.update_label()
+
                         # putting the FPS count on the frame
                         cv2.putText(img, fps, (7, 25), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                        cv2.putText(img, f"Recording: {stateManager.is_recording}", (70, 25), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                        cv2.putText(img, f"Recording: {stateManager.is_recording.is_set()}", (70, 25), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
                         cv2.putText(img, key, (7, 55), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
                         cv2.putText(img, mouse, (7, 85), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
@@ -147,15 +167,16 @@ class DataCollector:
                         cv2.imshow('collector', np.array(img))
                         if cv2.waitKey(1) & 0xFF == ord('p'):
                             cv2.destroyAllWindows()
-                            stateManager.is_not_exiting = False
+                            stateManager.is_exiting.set()
                             break
 
                 mouse_listener.join()
             key_listener.join()
         except Exception as e:
-            print(e)
+            print(f"Error in Collector: {e}")
+            traceback.print_exc()
         finally:
             self.dataset_file.close()
             cv2.destroyAllWindows()
-            stateManager.is_not_exiting = False
+            stateManager.is_exiting.set()
             print("DataCollector Closing...")

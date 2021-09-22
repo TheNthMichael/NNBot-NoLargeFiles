@@ -1,6 +1,7 @@
 import ctypes
 from math import ceil, floor
 import time
+import traceback
 import numpy as np
 from threading import Event, Lock
 from pynput.keyboard import Key, Controller as KeyController, Listener as KeyListener
@@ -65,6 +66,7 @@ class ActionHandler:
         self.realy = 0
         self.distance = 0
         self.step_count = 0
+        self.step = 0
         self.interval = 0
         self.keyboard = KeyController()
         self.mouse = MouseController()
@@ -74,22 +76,21 @@ class ActionHandler:
     This smooth mouse movement relies on making smaller movements wait until a whole pixel of transition is reached before doing any action.
     This may have issues with precision as the value must go over the integer threshold to be of use. It may be useful to overestimate pixel coords."""
     def update(self):
-        # press keybinds before moving mouse to avoid mouse delays
-        keybindHandler.update_button_presses(self.keyboard, self.mouse, self.action_onehot)
         # handle logic for smooth mouse movement
-        self.relx += self.mouse_x * (1 / self.step_count)
-        self.rely += self.mouse_y * (1 / self.step_count)
-        if self.relx >= 1:
-            self.realx = floor(self.relx)
-            self.relx -= self.realx
-        if self.rely >= 1:
-            self.realy = floor(self.rely)
-            self.rely -= self.realy
-        # Move mouse by measured real x and y values.
-        ctypes.windll.user32.mouse_event(0x01, self.realx, self.realy, 0, 0)
-        self.realx = 0
-        self.realy = 0
-        time.sleep(self.interval)
+        if self.step < self.step_count:
+            self.relx += self.mouse_x * (1 / self.step_count)
+            self.rely += self.mouse_y * (1 / self.step_count)
+            if self.relx >= 1:
+                self.realx = floor(self.relx)
+                self.relx -= self.realx
+            if self.rely >= 1:
+                self.realy = floor(self.rely)
+                self.rely -= self.realy
+            # Move mouse by measured real x and y values.
+            ctypes.windll.user32.mouse_event(0x01, self.realx, self.realy, 0, 0)
+            self.realx = 0
+            self.realy = 0
+            self.step += 1
 
     """Set the actions for the actionHandler to update over the span of 1/fps.
     
@@ -101,11 +102,18 @@ class ActionHandler:
         self.mouse_y = mousey
         self.distance = (self.mouse_x**2 + self.mouse_y**2)**0.5
         self.step_count = int(ceil(self.distance))
-        self.interval = 1 / (self.fps * self.step_count)
+        self.step = 0
+        if (self.step_count == 0):
+            self.interval = 0
+        else:
+            self.interval = 1 / (self.fps * self.step_count)
         self.relx = 0
         self.rely = 0
         self.realx = 0
         self.realy = 0
+        # press keybinds before moving mouse to avoid mouse delays
+        keybindHandler.update_button_presses(self.keyboard, self.mouse, self.action_onehot)
+        # start updating
         self.update()
 
     def release_pressed_buttons(self):
@@ -122,11 +130,14 @@ def action_handler_thread(action_handler: ActionHandler, exit_event, recording_e
             # Here we disable updating.
             if recording_event.is_set():
                 action_handler.update()
+                time.sleep(action_handler.interval)
             else:
                 action_handler.release_pressed_buttons()
+                time.sleep(action_handler.interval)
     except Exception as e:
-        print(e)
+        traceback.print_exc()
+        print(f"Error in ActionThread: {e}")
     finally:
-        exit_event.set()
+        print("Closing action_handler_thread...")
         action_handler.release_pressed_buttons()
-        print("Closing frame_handler_thread...")
+        exit_event.set()

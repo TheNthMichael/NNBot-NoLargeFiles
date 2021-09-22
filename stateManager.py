@@ -1,7 +1,7 @@
 from threading import Event, Lock
 
 is_recording = Event()
-is_not_exiting = Event()
+is_exiting = Event()
 
 def toggle_recording():
     if is_recording.is_set():
@@ -16,11 +16,11 @@ screen_cap_scale = 8
 
 FPS = 20
 
-HISTORY_LENGTH = 10
+HISTORY_LENGTH = FPS
 
 MAX_CHUNK_SIZE = 10000000
 
-KEY_THRESHOLD = 0.5
+KEY_THRESHOLD = 0.3
 
 monitor_region = {'top': 0, 'left': 0, 'width': 1920, 'height': 1080}
 
