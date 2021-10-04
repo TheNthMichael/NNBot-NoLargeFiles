@@ -1,14 +1,15 @@
 # This code was yoinked and reworked from here https://drive.google.com/file/d/1MOVhZhn0yv-Ngp0xK9jly-b_Ttx_2Tf7/view
 # Seems to work on random inputs and outputs. Trimmed out a branch of this model that is not in my use case.
 # Removed some weird loss function that I'm fairly certain was custom made for the authors expected outputs.
-
+import os
+os.environ['CUDA_VISIBLE_DEVICES']='-1'
 from stateManager import HISTORY_LENGTH, MAX_CHUNK_SIZE
 import keybindHandler
 import tensorflow as tf
 import numpy as np
 import keras
 import datetime
-import os
+
 from random import randint, shuffle
 from keras.layers import Dense, Dropout, LSTM, Flatten, Input, concatenate, TimeDistributed, MaxPooling2D, MaxPool2D, GlobalMaxPool2D, Conv2D, BatchNormalization, ConvLSTM2D
 from keras.models import Model
@@ -93,7 +94,7 @@ def build_model_non_stateful(input_shape=(1,1920,1080,3)):
     intermediate_model.trainable = True
     input_1 = Input(shape=input_shape,name='main_in')
     x = TimeDistributed(intermediate_model)(input_1)
-    x = ConvLSTM2D(filters=128,kernel_size=(3,3),stateful=False,return_sequences=True)(x)
+    x = ConvLSTM2D(filters=64,kernel_size=(3,3),stateful=False,return_sequences=True)(x)
     x = TimeDistributed(Flatten())(x)
     output_1 = TimeDistributed(Dense(keybindHandler.ACTION_CLASS_SIZE, activation='sigmoid'))(x)
     output_2 = TimeDistributed(Dense(keybindHandler.MOUSE_CLASS_SIZE, activation='softmax'))(x)
