@@ -19,8 +19,9 @@ FPS = 20
 HISTORY_LENGTH = FPS
 
 MAX_CHUNK_SIZE = 10000000
+#MAX_CHUNK_SIZE = 2000
 
-KEY_THRESHOLD = 0.3
+KEY_THRESHOLD = 0.6
 
 monitor_region = {'top': 0, 'left': 0, 'width': 1920, 'height': 1080}
 

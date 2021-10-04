@@ -24,10 +24,10 @@ def on_press_handler(key):
 
 Listens for commands that signal to start recording or to exit the program."""
 def on_release_handler(key):
-    if key == Key.f3:
+    if key == Key.f6:
         stateManager.toggle_recording()
         return not stateManager.is_exiting.is_set()
-    if key == Key.esc:
+    if key == Key.f9:
         stateManager.is_exiting.set()
         return not stateManager.is_exiting.is_set()
     keybindHandler.record_input(key, pressed=False)
@@ -83,10 +83,10 @@ class DataCollector:
                 f"dataset{datetime.now().strftime('%Y%m%d%H%M%S')}.pickle")
         self.dataset_file = open(self.dataset_path, "wb")
         self.frameHandler = FrameHandler(stateManager.monitor_region, stateManager.FPS)
-        """if DataCollector.overlay is None:
+        if DataCollector.overlay is None:
             DataCollector.overlay = Overlay(overlay_close, overlay_text)
         if DataCollector.overlay_text is None:
-            DataCollector.overlay_text = "WAITING..." """
+            DataCollector.overlay_text = "WAITING..."
     
     """Dumps the TrainingSample object to the pickle file.
     These objects are appended to the same file and can be read
@@ -154,8 +154,8 @@ class DataCollector:
 
                         fps = f"fps: {fps}"
 
-                        #DataCollector.overlay_text = f"FPS: {fps} | Recording: {stateManager.is_recording.is_set()} |Keys Pressed: {key} | Mouse: {mouse}"
-                        #DataCollector.overlay.update_label()
+                        DataCollector.overlay_text = f"FPS: {fps} | Recording: {stateManager.is_recording.is_set()} |Keys Pressed: {key} | Mouse: {mouse}"
+                        DataCollector.overlay.update_label()
 
                         # putting the FPS count on the frame
                         cv2.putText(img, fps, (7, 25), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)

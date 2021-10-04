@@ -10,14 +10,15 @@ import keras
 import datetime
 import os
 from random import randint, shuffle
-from keras.layers import Dense, Dropout, CuDNNLSTM, LSTM, Flatten, Input,\
-Activation, Conv2D, MaxPooling2D, Conv1D, MaxPooling1D, concatenate, ConvLSTM2D
+from keras.layers import Dense, Dropout, LSTM, Flatten, Input, concatenate, TimeDistributed, MaxPooling2D, MaxPool2D, GlobalMaxPool2D, Conv2D, BatchNormalization
 from keras.models import Model
 import keras.metrics
 from tensorflow.keras.utils import Sequence
 from keras.callbacks import TensorBoard, EarlyStopping
 import keras.backend as K
-from dataLoader import DataLoader
+from dataLoader2 import DataLoader
+
+
 
 
 def generate_data(data_set):
@@ -51,6 +52,48 @@ def create_data_generator(path, chunk_size):
                 yield ([X2, X3], y)
             dataLoader = DataLoader(path, normalize=True, chunk_size=chunk_size)
     return dl_generator
+
+def build_convnet_eff(shape=(112, 112, 3)):
+    model = keras.Sequential()
+    tf.keras.applications.efficientnet.EfficientNetB0()
+    model.add(Conv2D(64, (3,3), input_shape=shape, activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    model.add(Conv2D(128, (3,3), input_shape=shape, activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+ 
+    # flatten...
+    model.add(GlobalMaxPool2D())
+    return model
+
+def build_convnet(shape=(112, 112, 3)):
+    momentum = .9
+    model = keras.Sequential()
+    model.add(Conv2D(32, (3,3), input_shape=shape,
+        padding='same', activation='relu'))
+    model.add(Conv2D(32, (3,3), padding='same', activation='relu'))
+    model.add(BatchNormalization(momentum=momentum))
+    
+    model.add(MaxPool2D())
+    
+    model.add(Conv2D(64, (3,3), padding='same', activation='relu'))
+    model.add(Conv2D(64, (3,3), padding='same', activation='relu'))
+    model.add(BatchNormalization(momentum=momentum))
+    
+    """model.add(MaxPool2D())
+    
+    model.add(Conv2D(256, (3,3), padding='same', activation='relu'))
+    model.add(Conv2D(256, (3,3), padding='same', activation='relu'))
+    model.add(BatchNormalization(momentum=momentum))
+    
+    model.add(MaxPool2D())
+    
+    model.add(Conv2D(512, (3,3), padding='same', activation='relu'))
+    model.add(Conv2D(512, (3,3), padding='same', activation='relu'))
+    model.add(BatchNormalization(momentum=momentum))"""
+    
+    # flatten...
+    model.add(GlobalMaxPool2D())
+    return model
 
 
 def train(path, chunk_size:int=None, model_save_name:str=None):
@@ -138,23 +181,20 @@ def train(path, chunk_size:int=None, model_save_name:str=None):
     print(NAME)
     tensorBoard = TensorBoard(log_dir=f"logs/{NAME}")
 
-    inputImage = Input(shape=x2_train[0].shape)
+    inputImages = Input(shape=x2_train[0].shape)
     inputHistory = Input(shape=x3_train[0].shape)
 
     # Image Branch
-    y = Conv2D(layerSize, (3,3))(inputImage)
-    y = Activation("relu")(y)
-    y = MaxPooling2D(pool_size=(2,2))(y)
+    cnv = build_convnet_eff(shape=x2_train[0].shape[1:])
 
-    y = Conv2D(layerSize, (3,3))(y)
-    y = Activation("relu")(y)
-    y = MaxPooling2D(pool_size=(2,2))(y)
+    y = TimeDistributed(cnv)(inputImages)
+    y = LSTM(layerSize, return_sequences=False)(y)
 
     y = Flatten()(y)
-    y = Model(inputs=inputImage, outputs=y)
+    y = Model(inputs=inputImages, outputs=y)
 
     # History Branch
-    w = LSTM(layerSize, input_shape=(1, x3_train.shape[1]), return_sequences=False)(inputHistory)
+    w = LSTM(layerSize, input_shape=(None, x3_train.shape[1]), return_sequences=False, stateful=False)(inputHistory)
     w = Dropout(dropout)(w)
     w = Flatten()(w)
     w = Model(inputs=inputHistory, outputs=w)
@@ -180,11 +220,11 @@ def train(path, chunk_size:int=None, model_save_name:str=None):
     #opt = keras.optimizers.Adam(lr=1e-4, decay=1e-5)
     model.compile(optimizer=opt, loss="binary_crossentropy", metrics=[f1])
 
-    dl_gen = create_data_generator(path, chunk_size=20)
+    dl_gen = create_data_generator(path, chunk_size=5)
 
-    model.fit_generator(dl_gen(),\
-            epochs=100, steps_per_epoch=number_of_samples // 20,\
-            callbacks=[tensorBoard])
+    model.fit(dl_gen(),\
+            epochs=64, steps_per_epoch=number_of_samples // 5,\
+            callbacks=[tensorBoard, earlystopper])
 
     """for epoch in range(100):
         # Create a new data loader for the max chunk size

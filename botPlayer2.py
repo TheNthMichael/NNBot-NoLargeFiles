@@ -79,6 +79,12 @@ def play(model_path: str):
         output_template.extend(keybindHandler.mouse_to_classification([300,300]))
         input_history = [output_template[:] for _ in range(stateManager.HISTORY_LENGTH)]
 
+        frame_handler.update()
+        img = frame_handler.get_current_frame()
+        img = cv2.resize(img, stateManager.screen_cap_sizes)
+        frame_template = img * 0
+        frames_history = [frame_template[:] for _ in range(stateManager.HISTORY_LENGTH)]
+
         # used to record the time at which we processed current frame
         new_frame_time = 0
         with KeyListener(on_press = on_press_handler,
@@ -90,8 +96,10 @@ def play(model_path: str):
                 img = cv2.resize(img, stateManager.screen_cap_sizes)
                 
                 if stateManager.is_recording.is_set():
-                    
-                    X2 = [[(img / 255) for i in range(20)]]
+                    img = img / 255
+                    frames_history.pop(0)
+                    frames_history.append(img)
+                    X2 = [frames_history for i in range(1)]
                     X2 = np.asarray(X2)
                     X3 = [input_history for i in range(1)]
                     X3 = np.asarray(X3)

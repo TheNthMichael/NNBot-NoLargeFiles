@@ -1,6 +1,6 @@
 import argparse
-from botPlayer import play
-from botTrainer import train
+from botPlayer2 import play
+from botTrainer2 import train
 from dataCollector import DataCollector
 from botReTrainer import re_train
 

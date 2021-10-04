@@ -12,12 +12,15 @@ class FrameHandler:
         self.resolution = self.frame_height * self.frame_width
         self.num_channels = 3
         self.cmd = f'.\\Resources\\ffmpeg.exe -f gdigrab -framerate {self.fps} -offset_x {self.region["left"]} -offset_y {self.region["top"]} -video_size {self.region["width"]}x{self.region["height"]} -i desktop -pix_fmt bgr24 -vcodec rawvideo -an -sn -f rawvideo -'
+        #self.cmd = f'.\\Resources\\ffmpeg.exe -f gdigrab -offset_x {self.region["left"]} -offset_y {self.region["top"]} -video_size {self.region["width"]}x{self.region["height"]} -i desktop -pix_fmt bgr24 -vcodec rawvideo -an -sn -f rawvideo -'
+
         # Don't use stderr=subprocess.STDOUT, and don't use shell=True
         self.proc = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         self.last_frame = None
 
     def update(self):
         raw_frame = self.proc.stdout.read(self.resolution * self.num_channels)
+        self.proc.stdout.flush()
         frame = np.frombuffer(raw_frame, np.uint8)  # Use frombuffer instead of fromarray
         self.last_frame = frame.reshape((self.frame_height, self.frame_width, self.num_channels))
 

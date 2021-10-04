@@ -27,6 +27,15 @@ class DataLoader:
         output_template = [1 for _ in keybindHandler.ACTION_TO_BUTTON]
         output_template.extend(keybindHandler.mouse_to_classification([300,300]))
         self.input_history = [output_template[:] for _ in range(stateManager.HISTORY_LENGTH)]
+
+        # Read first sample image for image sizes.
+        sample = pickle.load(self.the_file)
+        frame_template = sample.frame * 0
+        self.frames_history = [frame_template[:] for _ in range(stateManager.HISTORY_LENGTH)]
+
+        # Reset the file
+        self.the_file.close()
+        self.the_file = open(self.path, 'rb')
     
     def get_number_of_samples(self):
         count = 0
@@ -72,9 +81,14 @@ class DataLoader:
                 frame = sample.frame
                 mouse_encoded = keybindHandler.mouse_to_classification(mouse)
                 input_history_sample = np.append(keys, mouse_encoded)
+
                 self.input_history.pop(0)
                 self.input_history.append(input_history_sample[:])
-                training_inputs_frames.append(frame[:])
+
+                self.frames_history.pop(0)
+                self.frames_history.append(frame[:])
+
+                training_inputs_frames.append(self.frames_history[:])
                 training_inputs_histories.append(self.input_history[:])
 
                 output = np.append(keys, mouse_encoded)

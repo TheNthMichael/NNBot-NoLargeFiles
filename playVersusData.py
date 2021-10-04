@@ -33,9 +33,9 @@ def f1(y_true, y_pred):
     return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
 
 
-the_file = open("TestData/aottg_overlay_test.pickle", "rb")
+the_file = open("TestData/ds_racing.pickle", "rb")
 
-the_model = "Models/km_aottg_ov.model"
+the_model = "Models/racing_fitgen.model"
 
 model = keras.models.load_model(the_model, custom_objects={"f1": f1, "my_loss": my_loss})
 

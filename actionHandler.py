@@ -65,7 +65,7 @@ class ActionHandler:
         self.realx = 0
         self.realy = 0
         self.distance = 0
-        self.step_count = 0
+        self.step_count = 0.000001
         self.step = 0
         self.interval = 0
         self.keyboard = KeyController()
@@ -73,24 +73,23 @@ class ActionHandler:
 
     """Updates the button presses (expected to change every 1/20 seconds) and smoothly transitions the mouse over this time frame.
     This update function requires that the timer is reset to avoid time.sleep delays growing larger.
-    This smooth mouse movement relies on making smaller movements wait until a whole pixel of transition is reached before doing any action.
+    This smooth mouse movement relies on making smaller increments < 1 pixel wait until a whole pixel of transition is reached before doing any action.
     This may have issues with precision as the value must go over the integer threshold to be of use. It may be useful to overestimate pixel coords."""
     def update(self):
         # handle logic for smooth mouse movement
-        if self.step < self.step_count:
-            self.relx += self.mouse_x * (1 / self.step_count)
-            self.rely += self.mouse_y * (1 / self.step_count)
-            if self.relx >= 1:
-                self.realx = floor(self.relx)
-                self.relx -= self.realx
-            if self.rely >= 1:
-                self.realy = floor(self.rely)
-                self.rely -= self.realy
-            # Move mouse by measured real x and y values.
-            ctypes.windll.user32.mouse_event(0x01, self.realx, self.realy, 0, 0)
-            self.realx = 0
-            self.realy = 0
-            self.step += 1
+        self.relx += self.mouse_x * (1 / self.step_count)
+        self.rely += self.mouse_y * (1 / self.step_count)
+        if self.relx >= 1:
+            self.realx = floor(self.relx)
+            self.relx -= self.realx
+        if self.rely >= 1:
+            self.realy = floor(self.rely)
+            self.rely -= self.realy
+        # Move mouse by measured real x and y values.
+        ctypes.windll.user32.mouse_event(0x01, self.realx, self.realy, 0, 0)
+        self.realx = 0
+        self.realy = 0
+        self.step += 1
 
     """Set the actions for the actionHandler to update over the span of 1/fps.
     
@@ -104,6 +103,7 @@ class ActionHandler:
         self.step_count = int(ceil(self.distance))
         self.step = 0
         if (self.step_count == 0):
+            self.step_count = 0.0000001
             self.interval = 0
         else:
             self.interval = 1 / (self.fps * self.step_count)
@@ -123,7 +123,7 @@ class ActionHandler:
 
 Mouse inputs are interpolated over the expected fps.
 This may lead to slightly inaccurate movements.
-This can be fixed by creating your ActionHandler with an fps less than the expected fps."""
+This can be fixed by creating your ActionHandler with an fps higher than the expected fps."""
 def action_handler_thread(action_handler: ActionHandler, exit_event, recording_event):
     try:
         while not exit_event.is_set():
@@ -133,7 +133,7 @@ def action_handler_thread(action_handler: ActionHandler, exit_event, recording_e
                 time.sleep(action_handler.interval)
             else:
                 action_handler.release_pressed_buttons()
-                time.sleep(action_handler.interval)
+                time.sleep(1/action_handler.fps)
     except Exception as e:
         traceback.print_exc()
         print(f"Error in ActionThread: {e}")
