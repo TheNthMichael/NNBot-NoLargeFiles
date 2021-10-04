@@ -182,6 +182,7 @@ def mouse_to_classification(mouse):
         mousex_class_output.extend(mousey_class_output)
         return mousex_class_output
 
+
 """Takes the one-hot encoded buttons and either presses that button down or releases that button.
 Manages an array of currently pressed keys for release when we stop the bot.
 """

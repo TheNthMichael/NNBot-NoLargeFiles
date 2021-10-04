@@ -10,29 +10,32 @@ import keras
 import datetime
 import os
 from random import randint, shuffle
-from keras.layers import Dense, Dropout, LSTM, Flatten, Input, concatenate, TimeDistributed, MaxPooling2D, MaxPool2D, GlobalMaxPool2D, Conv2D, BatchNormalization
+from keras.layers import Dense, Dropout, LSTM, Flatten, Input, concatenate, TimeDistributed, MaxPooling2D, MaxPool2D, GlobalMaxPool2D, Conv2D, BatchNormalization, ConvLSTM2D
 from keras.models import Model
 import keras.metrics
 from tensorflow.keras.utils import Sequence
 from keras.callbacks import TensorBoard, EarlyStopping
+from tensorflow.keras.applications.efficientnet import EfficientNetB0
 import keras.backend as K
 from dataLoader2 import DataLoader
 
 
-
-
-def generate_data(data_set):
-    X2 = data_set[0]
-    X2 = np.asarray(X2, dtype=np.float32)
-    X2 = X2 / 255 # Normlization of image data
-
-    X3 = data_set[1]
-    X3 = np.asarray(X3)
-
-    y = data_set[2]
-    y = np.asarray(y, dtype=np.float32)
-
-    return X2, X3, y
+# This metric was taken from here: https://drive.google.com/file/d/1MOVhZhn0yv-Ngp0xK9jly-b_Ttx_2Tf7/view
+# by the author of said paper who took it from a stackoverflow post listed there
+def f1(y_true, y_pred):
+    def recall(y_true, y_pred):
+        true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+        possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+        recall = true_positives / (possible_positives + K.epsilon())
+        return recall
+    def precision(y_true, y_pred):
+        true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+        possible_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+        precision = true_positives / (possible_positives + K.epsilon())
+        return precision
+    precision = precision(y_true, y_pred)
+    recall = recall(y_true, y_pred)
+    return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
 
 def create_data_generator(path, chunk_size):
     def dl_generator():
@@ -49,7 +52,7 @@ def create_data_generator(path, chunk_size):
                 y = data_set[2]
                 y = np.asarray(y, dtype=np.float32)
 
-                yield ([X2, X3], y)
+                yield (X2, y)
             dataLoader = DataLoader(path, normalize=True, chunk_size=chunk_size)
     return dl_generator
 
@@ -79,41 +82,29 @@ def build_convnet(shape=(112, 112, 3)):
     model.add(Conv2D(64, (3,3), padding='same', activation='relu'))
     model.add(BatchNormalization(momentum=momentum))
     
-    """model.add(MaxPool2D())
-    
-    model.add(Conv2D(256, (3,3), padding='same', activation='relu'))
-    model.add(Conv2D(256, (3,3), padding='same', activation='relu'))
-    model.add(BatchNormalization(momentum=momentum))
-    
-    model.add(MaxPool2D())
-    
-    model.add(Conv2D(512, (3,3), padding='same', activation='relu'))
-    model.add(Conv2D(512, (3,3), padding='same', activation='relu'))
-    model.add(BatchNormalization(momentum=momentum))"""
-    
     # flatten...
     model.add(GlobalMaxPool2D())
     return model
 
+def build_model_non_stateful(input_shape=(1,1920,1080,3)):
+    base_model = EfficientNetB0(weights='imagenet',input_shape=(input_shape[1:]),include_top=False,drop_connect_rate=0.2)
+    base_model.trainable = True
+    intermediate_model= Model(inputs=base_model.input, outputs=base_model.layers[161].output)
+    intermediate_model.trainable = True
+    input_1 = Input(shape=input_shape,name='main_in')
+    x = TimeDistributed(intermediate_model)(input_1)
+    x = ConvLSTM2D(filters=128,kernel_size=(3,3),stateful=False,return_sequences=True)(x)
+    x = TimeDistributed(Flatten())(x)
+    output_1 = TimeDistributed(Dense(keybindHandler.ACTION_CLASS_SIZE, activation='sigmoid'))(x)
+    output_2 = TimeDistributed(Dense(keybindHandler.MOUSE_CLASS_SIZE, activation='softmax'))(x)
+    output_3 = TimeDistributed(Dense(keybindHandler.MOUSE_CLASS_SIZE, activation='softmax'))(x) 
+    output_4 = TimeDistributed(Dense(1, activation='linear'))(x) 
+    output_all = concatenate([output_1,output_2,output_3,output_4], axis=-1)
+    model = Model(input_1, output_all)
+    return model
+
 
 def train(path, chunk_size:int=None, model_save_name:str=None):
-
-    # This metric was taken from here: https://drive.google.com/file/d/1MOVhZhn0yv-Ngp0xK9jly-b_Ttx_2Tf7/view
-    # by the author of said paper who took it from a stackoverflow post listed there
-    def f1(y_true, y_pred):
-        def recall(y_true, y_pred):
-            true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
-            possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
-            recall = true_positives / (possible_positives + K.epsilon())
-            return recall
-        def precision(y_true, y_pred):
-            true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
-            possible_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
-            precision = true_positives / (possible_positives + K.epsilon())
-            return precision
-        precision = precision(y_true, y_pred)
-        recall = recall(y_true, y_pred)
-        return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
 
     # For getting the sizes, we will read the first sample, then ignore it.
     dataLoader = DataLoader(path, normalize=True, chunk_size=HISTORY_LENGTH)
@@ -125,15 +116,6 @@ def train(path, chunk_size:int=None, model_save_name:str=None):
         break
     dataLoader.the_file.close()
     dataLoader = None
-
-    """X2 = [(np.random.rand(1920 // 8, 1080 // 8, 3) * 255)//1 for i in range(100)]
-    X2 = np.asarray(X2, dtype=np.float32)
-    X2 = X2 / 255 # Normlization of image data
-
-    X3 = [[[randint(0, 1) for w in range(20)] for j in range(5)] for i in range(100)]
-    X3 = np.asarray(X3)
-
-    y = [[randint(0, 1) for w in range(20)] for i in range(100)]"""
 
     X2 = data_sets[0]
     X2 = np.asarray(X2, dtype=np.float32)
@@ -157,17 +139,8 @@ def train(path, chunk_size:int=None, model_save_name:str=None):
     x3_train = X3
     y_train = y
 
-    """x2_test = X2[trainingSize:]
-    x3_test = X3[trainingSize:]
-    y_test = y[trainingSize:]"""
 
 
-
-    layerSize = 128
-    conv1Layer = 2
-    conv2Layer = 3
-    denseLayer = 2
-    dropout = 0.3
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
@@ -175,48 +148,14 @@ def train(path, chunk_size:int=None, model_save_name:str=None):
     timenow = str(datetime.datetime.now()).replace(":","_")
     earlystopper = EarlyStopping(monitor="f1", patience=patience, verbose=1, mode="max", restore_best_weights=True)
     if model_save_name is None:
-        NAME = f"{layerSize}-nodes-{conv1Layer}-conv1-{conv2Layer}-conv2-{denseLayer+1}-dense-earlyStopping-patience-{patience}-time-{timenow}"
+        NAME = f"csgopapermodel-earlyStopping-patience-{patience}-time-{timenow}"
     else:
         NAME = model_save_name
     print(NAME)
     tensorBoard = TensorBoard(log_dir=f"logs/{NAME}")
 
-    inputImages = Input(shape=x2_train[0].shape)
-    inputHistory = Input(shape=x3_train[0].shape)
-
-    # Image Branch
-    cnv = build_convnet_eff(shape=x2_train[0].shape[1:])
-
-    y = TimeDistributed(cnv)(inputImages)
-    y = LSTM(layerSize, return_sequences=False)(y)
-
-    y = Flatten()(y)
-    y = Model(inputs=inputImages, outputs=y)
-
-    # History Branch
-    w = LSTM(layerSize, input_shape=(None, x3_train.shape[1]), return_sequences=False, stateful=False)(inputHistory)
-    w = Dropout(dropout)(w)
-    w = Flatten()(w)
-    w = Model(inputs=inputHistory, outputs=w)
-
-    # Combine Inputs
-    combined = concatenate([y.output, w.output])
-
-    # Combined Branch
-    z = Dense(256, activation="relu")(combined)
-    z = Dropout(dropout)(z)
-
-    z = Dense(layerSize, activation="relu")(z)
-    z = Dropout(dropout)(z)
-
-    # Output Layer
-    z = Dense(len(keybindHandler.EMPTY_CLASSES_ONEHOT), activation="sigmoid")(z)
-    model = Model(inputs=[y.input, w.input], outputs=z)
+    model = build_model_non_stateful(x2_train[0].shape)
     opt = tf.keras.optimizers.Adam(learning_rate=1e-4, decay=1e-5)
-    def my_loss(targets, logits):
-        weights = np.array([0.8 for _ in range(len(keybindHandler.EMPTY_CLASSES_ONEHOT))])
-        return K.sum(targets * -K.log(1 - logits + 1e-10) * weights + (1 - targets) * -K.log(1 - logits + 1e-10) * (1 - weights), axis=-1)
-
     #opt = keras.optimizers.Adam(lr=1e-4, decay=1e-5)
     model.compile(optimizer=opt, loss="binary_crossentropy", metrics=[f1])
 
