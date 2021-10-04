@@ -29,5 +29,6 @@ Look into DQfD learning which combines imitation learning and reinforcement lear
 
 Change output layer to use different activation and loss functions for the x,y outputs to avoid averaging mouse movement at 0,0
 
-Rework action handler mouse output to smoothly transition between mouse updates by treating x and y as velocity vectors and constantly adding new x, y velocity vectors to a total.
 
+    Contact this prof:
+    Farhad_Pourkamali@uml.edu
