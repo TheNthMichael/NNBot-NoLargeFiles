@@ -94,7 +94,7 @@ def build_model_non_stateful(input_shape=(1,1920,1080,3)):
     intermediate_model.trainable = True
     input_1 = Input(shape=input_shape,name='main_in')
     x = TimeDistributed(intermediate_model)(input_1)
-    x = ConvLSTM2D(filters=64,kernel_size=(3,3),stateful=False,return_sequences=True)(x)
+    x = ConvLSTM2D(filters=256,kernel_size=(3,3),stateful=False,return_sequences=True)(x)
     x = TimeDistributed(Flatten())(x)
     output_1 = TimeDistributed(Dense(keybindHandler.ACTION_CLASS_SIZE, activation='sigmoid'))(x)
     output_2 = TimeDistributed(Dense(keybindHandler.MOUSE_CLASS_SIZE, activation='softmax'))(x)

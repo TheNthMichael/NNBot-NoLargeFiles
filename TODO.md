@@ -32,3 +32,6 @@ Change output layer to use different activation and loss functions for the x,y o
 
     Contact this prof:
     Farhad_Pourkamali@uml.edu
+
+Currently the input to the model is (240, 135) but in the paper, the input is (180, 80) While this may impact the memory usage,
+I doubt this will fix the memory issues we're encountering - especially if this person used 64 frame history per sample.
