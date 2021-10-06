@@ -49,7 +49,7 @@ class Overlay:
     def update_label(self) -> None:
         self.root.update()
         self.ping_text.set(self.get_new_text_callback())
-        self.root.after(self.update_frequency_ms, self.update_label)
+        #self.root.after(self.update_frequency_ms, self.update_label)
 
     def run(self) -> None:
         self.root.after(0, self.update_label)

@@ -112,7 +112,9 @@ class DataCollector:
                     while not stateManager.is_exiting.is_set():
                         self.frameHandler.update()
                         img = self.frameHandler.get_current_frame()
-                        img = cv2.resize(img, stateManager.screen_cap_sizes)
+                        # roi = im[y1:y2, x1:x2] We should use a region of interest to crop out unneded data and get a higher resolution closer to the area of interest.
+                        #img = cv2.resize(img, stateManager.screen_cap_sizes)
+                        img = stateManager.crop_to_new_aspect_ratio(img, stateManager.screen_cap_sizes_unscaled, (9, 5), (180, 80))
 
                         cur_mousex = keybindHandler.last_mouse_moved_x
                         cur_mousey = keybindHandler.last_mouse_moved_y

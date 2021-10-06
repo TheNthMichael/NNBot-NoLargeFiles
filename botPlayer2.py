@@ -14,6 +14,7 @@ from frameHandler import *
 import keras.backend as K
 import random
 import tensorflow as tf
+from botTrainer2 import copy_weights_from_non_stateful_to_stateful
 
 """Handle mouse button presses and releases."""
 def on_click_handler(x, y, button, pressed):
@@ -64,6 +65,7 @@ def play(model_path: str):
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
     model = keras.models.load_model(model_path, custom_objects={"f1": f1, "my_loss": my_loss})
+    model = copy_weights_from_non_stateful_to_stateful(model, (1, 1, 180, 80, 3))
     frame_handler = FrameHandler(stateManager.monitor_region, stateManager.FPS)
     action_handler = actionHandler.ActionHandler(500)
     #data_lock = threading.Lock()
@@ -82,8 +84,8 @@ def play(model_path: str):
         frame_handler.update()
         img = frame_handler.get_current_frame()
         img = cv2.resize(img, stateManager.screen_cap_sizes)
-        frame_template = img * 0
-        frames_history = [frame_template[:] for _ in range(stateManager.HISTORY_LENGTH)]
+        #frame_template = img * 0
+        #frames_history = [frame_template[:] for _ in range(stateManager.HISTORY_LENGTH)]
 
         # used to record the time at which we processed current frame
         new_frame_time = 0
@@ -93,19 +95,19 @@ def play(model_path: str):
             while not stateManager.is_exiting.is_set():
                 frame_handler.update()
                 img = frame_handler.get_current_frame()
-                img = cv2.resize(img, stateManager.screen_cap_sizes)
+                img = stateManager.crop_to_new_aspect_ratio(img, stateManager.screen_cap_sizes_unscaled, (5, 9), (80, 180))
                 
                 if stateManager.is_recording.is_set():
                     img = img / 255
-                    frames_history.pop(0)
-                    frames_history.append(img)
-                    X2 = [frames_history for i in range(1)]
+                    #frames_history.pop(0)
+                    #frames_history.append(img)
+                    X2 = [[img for i in range(1)] for j in range(1)]
                     X2 = np.asarray(X2)
                     X3 = [input_history for i in range(1)]
                     X3 = np.asarray(X3)
 
                     #output = model.predict([X2, X3])[0]
-                    output = model([X2, X3])[0]
+                    output = model(X2)[0][0]
 
                     #print(output)
 
@@ -129,7 +131,7 @@ def play(model_path: str):
                     mousey = keybindHandler.MOUSE_CLASSES[mousey_ind]
 
                     # Update the keys and mouse inputs - May need a data lock here to avoid issues with concurrency.
-                    action_handler.set_controller_action(keys, mousex * 100, mousey * 100)
+                    action_handler.set_controller_action(keys, mousex, mousey)
                     #for i in range(stateManager.FPS):
                         #action_handler.update()    
 
